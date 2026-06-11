@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<title>Taseca · Barber & Tattoo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:#080c10;font-family:'Segoe UI',system-ui,sans-serif;overflow-x:hidden}
+#root{max-width:430px;margin:0 auto;min-height:100vh}
+input,select,button{font-family:inherit}
+select option{background:#1a2230;color:#f0f0f0}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-thumb{background:#c9a84c44;border-radius:3px}
+</style>
+</head>
+<body>
+<div id="root"><div style="color:#c9a84c;text-align:center;padding:40px;font-size:18px">Cargando Taseca...</div></div>
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import{getFirestore,collection,doc,setDoc,deleteDoc,getDocs}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+const app=initializeApp({apiKey:"AIzaSyCBUvFv_ftz2kH3_YBA-CM_0Kwgpa_ftSk",authDomain:"tasecav2.firebaseapp.com",projectId:"tasecav2",storageBucket:"tasecav2.firebasestorage.app",messagingSenderId:"49724085265",appId:"1:49724085265:web:b3a1a05196702aa2524db0"});
+const db=getFirestore(app);
+window._db=db;window._fb={collection,doc,setDoc,deleteDoc,getDocs};
+window.dispatchEvent(new Event("fbReady"));
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>
+  // Reemplaza con tus datos de EmailJS
+  window.EMAILJS_SVC  = "YOUR_SERVICE_ID";
+  window.EMAILJS_TPL  = "YOUR_TEMPLATE_ID";
+  window.EMAILJS_KEY  = "YOUR_PUBLIC_KEY";
+</script>
+<script type="text/babel" data-presets="react,env">
+var _useState=React.useState,_useEffect=React.useEffect,_useRef=React.useRef,_useMemo=React.useMemo,_useCallback=React.useCallback;
+
+/* ─── FIREBASE ─────────────────────────────────────────────────── */
+var DB={
+  save:async function(col,id,data){var r=window._fb;await r.setDoc(r.doc(window._db,col,String(id)),data);},
+  del:async function(col,id){var r=window._fb;await r.deleteDoc(r.doc(window._db,col,String(id)));},
+  all:async function(col){var r=window._fb;var s=await r.getDocs(r.collection(window._db,col));return s.docs.map(function(d){return d.data();});}
+};
+
+/* ─── COLORES ───────────────────────────────────────────────────── */
+var C={bg:"#080c10",card:"#111820",accent:"#c9a84c",cyan:"#4ecdc4",text:"#f0f0f0",muted:"#6a7a8a",border:"#1e2a35",ok:"#2ecc71",err:"#e74c3c",warn:"#f39c12"};
+
+/* ─── DEFAULTS ──────────────────────────────────────────────────── */
+var DEF_CFG={id:"cfg",stampsOn:true};
+var DEF_USERS=[
+  {id:"u1",name:"Juan Barbero",role:"barbero",pin:"1234",photo:null,workDays:[1,2,3,4,5],wStart:"09:00",wEnd:"19:00",blocks:{}},
+  {id:"u2",name:"Maria Tatuadora",role:"tatuador",pin:"5678",photo:null,workDays:[2,3,4,5,6],wStart:"10:00",wEnd:"18:00",blocks:{}},
+  {id:"u3",name:"Admin",role:"admin",pin:"0000",photo:null,workDays:[1,2,3,4,5,6],wStart:"08:00",wEnd:"21:00",blocks:{}}
+];
+var DEF_SVC=[
+  {id:"s1",name:"Corte clasico",cat:"barberia",price:15,dur:30},
+  {id:"s2",name:"Barba y perfilado",cat:"barberia",price:12,dur:25},
+  {id:"s3",name:"Tatuaje pequeno",cat:"tatuaje",price:80,dur:60},
+  {id:"s4",name:"Tatuaje mediano",cat:"tatuaje",price:150,dur:120}
+];
+
+/* ─── CONSTANTES ────────────────────────────────────────────────── */
+var ROLES={admin:"Administrador",barbero:"Barbero",tatuador:"Tatuador/a",recepcionista:"Recepcionista"};
+var RTABS={admin:["agenda","clientes","fidelidad","catalogo","caja","reportes","config"],barbero:["agenda","clientes","fidelidad","catalogo","reportes"],tatuador:["agenda","clientes","fidelidad","catalogo","reportes"],recepcionista:["agenda","clientes"]};
+var SC={confirmado:"#4ecdc4",pendiente:"#f39c12",cancelado:"#e74c3c",walk_in:"#8e44ad"};
+var SL={confirmado:"Confirmado",pendiente:"Pendiente",cancelado:"Cancelado",walk_in:"Sin cita"};
+var CAT={barberia:"#3498db",tatuaje:"#8e44ad"};
+var MO=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+var MS=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+var DY=["Do","Lu","Ma","Mi","Ju","Vi","Sa"];
+
+/* Slots 30min 8am-9pm */
+var SLOTS=[];
+for(var _h=8;_h<21;_h++){SLOTS.push((_h<10?"0":"")+_h+":00");SLOTS.push((_h<10?"0":"")+_h+":30");}
+
+/* ─── HELPERS ───────────────────────────────────────────────────── */
+function pt(t){var p=t.split(":");return parseInt(p[0])*60+parseInt(p[1]);}
+function ts(d){return d.toISOString().slice(0,10);}
+function today(){return ts(new Date());}
+function vPhone(p){return (p||"").replace(/\D/g,"").length===10;}
+function calDays(y,m){var days=[],f=new Date(y,m,1),l=new Date(y,m+1,0);for(var i=0;i<f.getDay();i++)days.push(null);for(var d=1;d<=l.getDate();d++)days.push(new Date(y,m,d));return days;}
+function weekOf(base){var d=new Date(base),sun=new Date(d);sun.setDate(d.getDate()-d.getDay());return Array.from({length:7},function(_,i){var x=new Date(sun);x.setDate(sun.getDate()+i);return x;});}
+
+/* ─── BASE STYLES ───────────────────────────────────────────────── */
+var S={
+  app:{background:"linear-gradient(160deg,#080c10,#0d1520)",minHeight:"100vh",maxWidth:430,margin:"0 auto",color:C.text},
+  card:{background:C.card,borderRadius:14,padding:"13px 15px",marginBottom:10,border:"1px solid "+C.border},
+  inp:{width:"100%",background:"#1a2230",border:"1px solid "+C.border,borderRadius:10,padding:"10px 12px",color:C.text,fontSize:14,boxSizing:"border-box",outline:"none"},
+  lbl:{fontSize:12,color:C.muted,marginBottom:4,display:"block"},
+  row:{display:"flex",justifyContent:"space-between",alignItems:"center"},
+  badge:function(col){return{background:col+"22",color:col,fontSize:11,padding:"2px 8px",borderRadius:20,fontWeight:600};},
+  btn:function(v){v=v||"gold";return{background:v==="gold"?C.accent:v==="cyan"?C.cyan:v==="err"?C.err:v==="ghost"?"transparent":C.border,color:v==="ghost"?C.muted:"#000",border:v==="ghost"?"1px solid "+C.border:"none",borderRadius:10,padding:"9px 15px",cursor:"pointer",fontWeight:700,fontSize:13};},
+  ov:{position:"fixed",inset:0,background:"rgba(0,0,0,0.82)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"},
+  mb:{background:C.card,borderRadius:"20px 20px 0 0",padding:"20px 16px 34px",width:"100%",maxWidth:430,maxHeight:"90vh",overflowY:"auto"}
+};
+
+/* ─── LOGO ──────────────────────────────────────────────────────── */
+function Logo(p){var sz=p.size||60;
+  return React.createElement("svg",{width:sz,height:sz,viewBox:"0 0 100 100",fill:"none"},
+    React.createElement("defs",null,React.createElement("linearGradient",{id:"lg",x1:"0%",y1:"100%",x2:"100%",y2:"0%"},React.createElement("stop",{offset:"0%",stopColor:"#c9a84c"}),React.createElement("stop",{offset:"100%",stopColor:"#4ecdc4"}))),
+    React.createElement("circle",{cx:50,cy:45,r:36,stroke:"#4ecdc4",strokeWidth:0.8,strokeDasharray:"3 3",fill:"none",opacity:0.5}),
+    React.createElement("polygon",{points:"50,8 88,78 12,78",stroke:"url(#lg)",strokeWidth:2.5,fill:"none"}),
+    React.createElement("ellipse",{cx:50,cy:50,rx:13,ry:8,stroke:"url(#lg)",strokeWidth:1.8,fill:"#080c10"}),
+    React.createElement("circle",{cx:50,cy:50,r:4.5,fill:"url(#lg)"}),
+    React.createElement("circle",{cx:50,cy:50,r:2,fill:"#000"}),
+    React.createElement("rect",{x:40,y:64,width:3,height:7,fill:"url(#lg)",rx:1}),
+    React.createElement("rect",{x:45,y:61,width:3,height:10,fill:"url(#lg)",rx:1}),
+    React.createElement("rect",{x:50,y:58,width:3,height:13,fill:"url(#lg)",rx:1}),
+    React.createElement("rect",{x:55,y:61,width:3,height:10,fill:"url(#lg)",rx:1}),
+    React.createElement("rect",{x:60,y:64,width:3,height:7,fill:"url(#lg)",rx:1}),
+    React.createElement("circle",{cx:50,cy:8,r:2,fill:"#4ecdc4"}),
+    React.createElement("circle",{cx:88,cy:78,r:2,fill:"#4ecdc4"}),
+    React.createElement("circle",{cx:12,cy:78,r:2,fill:"#4ecdc4"})
+  );
+}
+
+/* ─── FIELD ─────────────────────────────────────────────────────── */
+function Field(p){
+  return (
+    <div style={{marginBottom:10}}>
+      <label style={S.lbl}>{p.label}</label>
+      {p.opts
+        ?<select style={S.inp} value={p.val||""} onChange={function(e){p.set(e.target.value);}}>
+           <option value="">Seleccionar...</option>
+           {p.opts.map(function(o){return <option key={o.v} value={o.v}>{o.l}</option>;})}
+         </select>
+        :<input style={S.inp} type={p.type||"text"} placeholder={p.ph||""} value={p.val||""}
+           onChange={function(e){p.set(e.target.value);}}
+           onKeyDown={function(e){if(e.key==="Enter")e.preventDefault();}}/>
+      }
+    </div>
+  );
+}
+
+/* ─── MODAL ─────────────────────────────────────────────────────── */
+function Mdl(p){
+  return (
+    <div style={S.ov} onClick={p.close}>
+      <div style={S.mb} onClick={function(e){e.stopPropagation();}} onKeyDown={function(e){if(e.key==="Enter")e.stopPropagation();}}>
+        <div style={{...S.row,marginBottom:14}}>
+          <b style={{fontSize:15,color:C.accent}}>{p.title}</b>
+          <button type="button" onClick={p.close} style={{background:"none",border:"none",color:C.muted,fontSize:22,cursor:"pointer"}}>✕</button>
+        </div>
+        {p.children}
+        <div style={{display:"flex",gap:10,marginTop:8}}>
+          <button type="button" style={{...S.btn("ghost"),flex:1}} onClick={p.close}>Cancelar</button>
+          <button type="button" style={{...S.btn(),flex:2}} onClick={p.save}>{p.saveLabel||"Guardar"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── TOGGLE ────────────────────────────────────────────────────── */
+function Toggle(p){
+  return (
+    <div onClick={p.onChange} style={{width:44,height:24,borderRadius:12,background:p.val?C.ok:C.border,cursor:"pointer",position:"relative",transition:"background .25s",flexShrink:0}}>
+      <div style={{width:18,height:18,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:p.val?23:3,transition:"left .25s"}}/>
+    </div>
+  );
+}
+
+/* ─── PHONE INPUT ───────────────────────────────────────────────── */
+function PhoneInput(p){
+  var digs=(p.val||"").replace(/\D/g,"");
+  var ok=digs.length===10;
+  return (
+    <div style={{marginBottom:10}}>
+      <label style={S.lbl}>{p.label||"Telefono (10 digitos)"}</label>
+      <div style={{position:"relative"}}>
+        <input style={{...S.inp,borderColor:digs.length>0?(ok?C.ok:C.err):C.border}} type="tel"
+          placeholder={p.ph||"0981000000"} value={p.val||""}
+          onChange={function(e){p.set(e.target.value.replace(/\D/g,"").slice(0,10));}}
+          onKeyDown={function(e){if(e.key==="Enter")e.preventDefault();}}/>
+        {digs.length>0&&<span style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",fontSize:11,color:ok?C.ok:C.err,fontWeight:700}}>{digs.length}/10</span>}
+      </div>
+    </div>
+  );
+}
+
+/* ─── STAMP CARD ────────────────────────────────────────────────── */
+function StampCard(p){
+  var n=p.n||0,tot=10;
+  return (
+    <div style={{background:"#1a1a0a",border:"1.5px solid "+C.accent+"44",borderRadius:13,padding:"13px 14px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+        <b style={{color:C.accent,fontSize:13}}>Tarjeta de Fidelidad</b>
+        <span style={{color:C.muted,fontSize:12}}>{n}/{tot}</span>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:5,marginBottom:10}}>
+        {Array.from({length:tot},function(_,i){
+          return <div key={i} style={{aspectRatio:"1",borderRadius:7,background:i<n?"linear-gradient(135deg,#c9a84c,#f0c040)":C.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>{i<n?"✂":""}</div>;
+        })}
+      </div>
+      <div style={{background:n>=tot?"#2ecc7122":"#1a2230",borderRadius:8,padding:"6px 10px",textAlign:"center",fontSize:12}}>
+        {n>=tot?<b style={{color:C.ok}}>Servicio gratis disponible! 🎉</b>:<span style={{color:C.muted}}>Faltan <b style={{color:C.accent}}>{tot-n}</b> sellos para tu servicio gratis</span>}
+      </div>
+    </div>
+  );
+}
+
+/* ─── POINTS BAR ────────────────────────────────────────────────── */
+function PtsBar(p){
+  var pts=p.pts||0;
+  var lvls=[{n:"Bronze",min:0,max:100,c:"#cd7f32"},{n:"Silver",min:100,max:300,c:"#aaa"},{n:"Gold",min:300,max:700,c:C.accent},{n:"Platinum",min:700,max:1500,c:C.cyan}];
+  var cur=lvls[0];
+  for(var i=0;i<lvls.length;i++){if(pts>=lvls[i].min&&(pts<lvls[i].max||i===lvls.length-1)){cur=lvls[i];break;}}
+  var pct=Math.min(100,cur.max>cur.min?((pts-cur.min)/(cur.max-cur.min))*100:100);
+  var nxt=lvls[lvls.indexOf(cur)+1];
+  return (
+    <div style={{background:"#161e2a",borderRadius:13,padding:"12px 13px",border:"1px solid "+cur.c+"44",marginTop:10}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+        <b style={{color:cur.c,fontSize:12}}>⭐ {cur.n}</b>
+        <b style={{color:C.accent,fontSize:13}}>{pts} pts</b>
+      </div>
+      <div style={{background:C.border,borderRadius:20,height:7,overflow:"hidden"}}>
+        <div style={{width:pct+"%",height:"100%",background:"linear-gradient(90deg,"+cur.c+","+C.accent+")",borderRadius:20}}/>
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",marginTop:3,fontSize:10,color:C.muted}}>
+        <span>{cur.n}</span><span>{nxt?cur.max+" → "+nxt.n:"MAX"}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── WEEK CALENDAR ─────────────────────────────────────────────── */
+function WeekCal(p){
+  var appts=p.appts,users=p.users,stId=p.stId,onSlot=p.onSlot,onAppt=p.onAppt;
+  var viewS=_useState("day");var view=viewS[0];var setView=viewS[1];
+  var curS=_useState(new Date());var cur=curS[0];var setCur=curS[1];
+  var staff=null;for(var i=0;i<users.length;i++){if(users[i].id===stId){staff=users[i];break;}}
+  var hrs=[];for(var h=8;h<21;h++)hrs.push(h);
+
+  /* Dates to show */
+  var wk=view==="week"?weekOf(cur):[cur];
+  var wStrs=wk.map(function(d){return ts(d);});
+  var wa=appts.filter(function(a){return(!stId||a.stId===stId)&&wStrs.indexOf(a.date)>=0;});
+
+  function isWork(date,hr,mn){
+    if(!staff)return true;
+    if(!staff.workDays||staff.workDays.indexOf(date.getDay())<0)return false;
+    var t=hr*60+mn,s=pt(staff.wStart||"09:00"),e=pt(staff.wEnd||"19:00");
+    return t>=s&&t<e;
+  }
+  function getAppt(ds,hr,mn){
+    var slot=(hr<10?"0":"")+hr+":"+(mn===0?"00":"30");
+    for(var i=0;i<wa.length;i++){if(wa[i].date===ds&&wa[i].time===slot)return wa[i];}
+    return null;
+  }
+
+  /* Navigation */
+  function prev(){var d=new Date(cur);d.setDate(d.getDate()-(view==="week"?7:1));setCur(d);}
+  function next(){var d=new Date(cur);d.setDate(d.getDate()+(view==="week"?7:1));setCur(d);}
+  function goToday(){setCur(new Date());}
+
+  /* Day header label */
+  function dayLabel(){
+    if(view==="day"){
+      var isT=ts(cur)===today();
+      return <span style={{fontSize:13,fontWeight:700,color:isT?C.accent:C.text}}>
+        {DY[cur.getDay()]} {cur.getDate()} de {MO[cur.getMonth()]} {cur.getFullYear()}
+        {isT&&<span style={{background:C.accent,color:"#000",fontSize:9,fontWeight:900,padding:"1px 6px",borderRadius:10,marginLeft:6}}>HOY</span>}
+      </span>;
+    }
+    var wkd=weekOf(cur);
+    return <span style={{fontSize:12,fontWeight:700}}>{MS[wkd[0].getMonth()]} {wkd[0].getDate()} – {wkd[6].getDate()}, {wkd[0].getFullYear()}</span>;
+  }
+
+  /* Day appointments summary (for day view header) */
+  var dayAppts=view==="day"?wa:[];
+  var pendCount=dayAppts.filter(function(a){return a.status==="pendiente";}).length;
+  var confCount=dayAppts.filter(function(a){return a.status==="confirmado";}).length;
+  var walkCount=dayAppts.filter(function(a){return a.status==="walk_in";}).length;
+
+  return (
+    <div style={{background:C.bg,border:"1px solid "+C.border,borderRadius:12,overflow:"hidden"}}>
+
+      {/* TOOLBAR */}
+      <div style={{borderBottom:"1px solid "+C.border}}>
+        {/* View toggle + nav */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px"}}>
+          <div style={{display:"flex",gap:4}}>
+            <button type="button" onClick={function(){setView("day");}} style={{padding:"4px 10px",borderRadius:8,border:"none",fontSize:11,fontWeight:700,cursor:"pointer",background:view==="day"?C.accent:"#1a2230",color:view==="day"?"#000":C.muted}}>Dia</button>
+            <button type="button" onClick={function(){setView("week");}} style={{padding:"4px 10px",borderRadius:8,border:"none",fontSize:11,fontWeight:700,cursor:"pointer",background:view==="week"?C.cyan:"#1a2230",color:view==="week"?"#000":C.muted}}>Semana</button>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <button type="button" onClick={prev} style={{background:"none",border:"none",color:C.accent,fontSize:18,cursor:"pointer",padding:"2px 5px"}}>‹</button>
+            {dayLabel()}
+            <button type="button" onClick={next} style={{background:"none",border:"none",color:C.accent,fontSize:18,cursor:"pointer",padding:"2px 5px"}}>›</button>
+          </div>
+          <button type="button" onClick={goToday} style={{padding:"4px 9px",borderRadius:8,border:"1px solid "+C.border,background:"transparent",color:C.muted,fontSize:10,cursor:"pointer"}}>Hoy</button>
+        </div>
+
+        {/* Day view summary bar */}
+        {view==="day"&&(pendCount+confCount+walkCount>0)&&(
+          <div style={{display:"flex",gap:10,padding:"5px 12px 8px",fontSize:11}}>
+            {confCount>0&&<span style={{color:C.cyan,fontWeight:700}}>✓ {confCount} confirmadas</span>}
+            {pendCount>0&&<span style={{color:C.warn,fontWeight:700}}>⏳ {pendCount} pendientes</span>}
+            {walkCount>0&&<span style={{color:"#8e44ad",fontWeight:700}}>⚡ {walkCount} walk-in</span>}
+          </div>
+        )}
+        {view==="day"&&(pendCount+confCount+walkCount===0)&&(
+          <div style={{padding:"4px 12px 8px",fontSize:11,color:C.muted}}>Sin citas para este dia</div>
+        )}
+      </div>
+
+      {/* GRID */}
+      <div style={{overflowY:"auto",maxHeight:"calc(100vh - 330px)"}}>
+        <div style={{minWidth:view==="week"?340:200}}>
+
+          {/* Column headers for week view */}
+          {view==="week"&&(
+            <div style={{display:"flex",borderBottom:"1px solid "+C.border,position:"sticky",top:0,background:C.bg,zIndex:5}}>
+              <div style={{width:36,flexShrink:0}}/>
+              {wk.map(function(d,i){
+                var isT=ts(d)===today();
+                var dAppts=appts.filter(function(a){return(!stId||a.stId===stId)&&a.date===ts(d);});
+                return <div key={i} style={{flex:1,textAlign:"center",padding:"5px 1px",minWidth:44,cursor:"pointer"}} onClick={function(){setCur(d);setView("day");}}>
+                  <div style={{fontSize:9,color:isT?C.accent:C.muted}}>{DY[d.getDay()]}</div>
+                  <div style={{width:22,height:22,borderRadius:"50%",background:isT?C.accent:"transparent",color:isT?"#000":C.text,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",margin:"1px auto 0",fontWeight:isT?900:400}}>{d.getDate()}</div>
+                  {dAppts.length>0&&<div style={{fontSize:8,color:isT?C.accent:C.muted,marginTop:1}}>{dAppts.length}c</div>}
+                </div>;
+              })}
+            </div>
+          )}
+
+          {/* Time rows */}
+          {hrs.map(function(hr){return [0,30].map(function(mn){
+            var slotKey=hr+"-"+mn;
+            return <div key={slotKey} style={{display:"flex",borderBottom:"1px solid "+C.border+"18",minHeight:view==="day"?44:28}}>
+              <div style={{width:36,flexShrink:0,display:"flex",alignItems:"flex-start",justifyContent:"flex-end",paddingRight:4,paddingTop:2}}>
+                {mn===0&&<span style={{fontSize:8,color:C.muted}}>{hr}:00</span>}
+              </div>
+              {wk.map(function(d,di){
+                var ds=ts(d),a=getAppt(ds,hr,mn),iw=isWork(d,hr,mn);
+                var bl=staff&&staff.blocks&&staff.blocks[ds];
+                var ib=bl===true||(bl&&((bl.morning&&hr<13)||(bl.afternoon&&hr>=13)));
+                var col=a?SC[a.status]||C.cyan:null;
+                var isToday=ds===today();
+                return <div key={di}
+                  onClick={function(){if(a)onAppt(a);else if(iw&&!ib)onSlot(d,hr,mn,stId);}}
+                  style={{flex:1,borderLeft:"1px solid "+C.border+"18",position:"relative",background:!iw?"#0a0c10":ib?"#1a0808":isToday&&view==="day"?"#12181f":"transparent",cursor:iw&&!ib?"pointer":"default"}}>
+                  {/* Empty slot hint on day view */}
+                  {view==="day"&&iw&&!ib&&!a&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",opacity:0,transition:"opacity .15s"}} className="slot-hint">
+                  </div>}
+                  {a&&<div style={{position:"absolute",inset:"2px 2px 2px 3px",background:col+"33",border:"1.5px solid "+col,borderRadius:5,padding:view==="day"?"4px 6px":"1px 3px",overflow:"hidden",zIndex:2}}>
+                    <div style={{fontSize:view==="day"?11:8,fontWeight:700,color:col,overflow:"hidden",whiteSpace:"nowrap",textOverflow:"ellipsis"}}>{a.client}</div>
+                    {view==="day"&&<div style={{fontSize:10,color:C.muted,marginTop:1}}>{a.svc}</div>}
+                    {view==="day"&&<div style={{display:"flex",gap:5,marginTop:3}}>
+                      <span style={S.badge(col)}>{SL[a.status]||a.status}</span>
+                    </div>}
+                    {view!=="day"&&<div style={{fontSize:7,color:C.muted,overflow:"hidden",whiteSpace:"nowrap"}}>{a.svc}</div>}
+                  </div>}
+                  {ib&&!a&&<div style={{position:"absolute",inset:0,background:"repeating-linear-gradient(45deg,"+C.err+"11,"+C.err+"11 3px,transparent 3px,transparent 7px)"}}/>}
+                  {view==="day"&&iw&&!ib&&!a&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",paddingLeft:8,opacity:0}} onMouseEnter={function(e){e.currentTarget.style.opacity=1;}} onMouseLeave={function(e){e.currentTarget.style.opacity=0;}}>
+                    <span style={{fontSize:9,color:C.muted}}>+ Agregar</span>
+                  </div>}
+                </div>;
+              })}
+            </div>;
+          });})}        </div>
+      </div>
+
+      {/* LEGEND */}
+      <div style={{display:"flex",gap:8,padding:"6px 10px",borderTop:"1px solid "+C.border,flexWrap:"wrap"}}>
+        {[[C.cyan,"Confirm."],[C.warn,"Pendiente"],["#8e44ad","Walk-in"],[C.err,"Bloqueado"]].map(function(x){return <div key={x[1]} style={{display:"flex",alignItems:"center",gap:3}}><div style={{width:7,height:7,borderRadius:2,background:x[0]}}/><span style={{fontSize:9,color:C.muted}}>{x[1]}</span></div>;})}
+      </div>
+    </div>
+  );
+}
+
+/* ─── SCHEDULE MODAL ────────────────────────────────────────────── */
+function SchedMdl(p){
+  var u=p.user;
+  var wds=_useState(u.workDays||[1,2,3,4,5]);var wd=wds[0];var setWd=wds[1];
+  var wss=_useState(u.wStart||"09:00");var ws=wss[0];var setWs=wss[1];
+  var wes=_useState(u.wEnd||"19:00");var we=wes[0];var setWe=wes[1];
+  var yrs=_useState(new Date().getFullYear());var yr=yrs[0];var setYr=yrs[1];
+  var mos=_useState(new Date().getMonth());var mo=mos[0];var setMo=mos[1];
+  var bls=_useState(u.blocks||{});var bl=bls[0];var setBl=bls[1];
+  var days=calDays(yr,mo);
+
+  function togDay(d){setWd(function(p){return p.indexOf(d)>=0?p.filter(function(x){return x!==d;}):[].concat(p,[d]).sort();});}
+  function togBlock(ds){setBl(function(p){var n=Object.assign({},p);if(n[ds])delete n[ds];else n[ds]=true;return n;});}
+  function applyPat(){var nb=Object.assign({},bl);days.forEach(function(d){if(!d)return;var ds=ts(d);if(wd.indexOf(d.getDay())<0)nb[ds]=true;});setBl(nb);}
+
+  var avDays=days.filter(function(d){return d&&wd.indexOf(d.getDay())>=0&&!bl[ts(d)];}).length;
+  var slots=Math.floor((pt(we)-pt(ws))/30);
+
+  function save(){var upd=Object.assign({},u,{workDays:wd,wStart:ws,wEnd:we,blocks:bl});p.onSave(upd);}
+
+  return (
+    <div style={S.ov} onClick={p.close}>
+      <div style={{...S.mb,maxHeight:"92vh"}} onClick={function(e){e.stopPropagation();}}>
+        <div style={{...S.row,marginBottom:14}}>
+          <b style={{fontSize:14,color:C.accent}}>Patron de Horario — {u.name}</b>
+          <button type="button" onClick={p.close} style={{background:"none",border:"none",color:C.muted,fontSize:22,cursor:"pointer"}}>✕</button>
+        </div>
+
+        <label style={{...S.lbl,fontWeight:700}}>DIAS LABORALES</label>
+        <div style={{display:"flex",gap:5,marginBottom:13,flexWrap:"wrap"}}>
+          {[["Do",0],["Lu",1],["Ma",2],["Mi",3],["Ju",4],["Vi",5],["Sa",6]].map(function(x){
+            return <button type="button" key={x[1]} onClick={function(){togDay(x[1]);}} style={{padding:"6px 10px",borderRadius:20,border:"none",fontSize:12,fontWeight:700,cursor:"pointer",background:wd.indexOf(x[1])>=0?C.cyan:"#1a2230",color:wd.indexOf(x[1])>=0?"#000":C.muted}}>{x[0]}</button>;
+          })}
+        </div>
+
+        <label style={{...S.lbl,fontWeight:700}}>HORARIO (puede ser 8am a 9pm)</label>
+        <div style={{display:"flex",gap:10,marginBottom:13}}>
+          <div style={{flex:1}}>
+            <label style={S.lbl}>Entrada</label>
+            <select style={S.inp} value={ws} onChange={function(e){setWs(e.target.value);}}>
+              {SLOTS.map(function(s){return <option key={s} value={s}>{s}</option>;})}
+            </select>
+          </div>
+          <div style={{flex:1}}>
+            <label style={S.lbl}>Salida</label>
+            <select style={S.inp} value={we} onChange={function(e){setWe(e.target.value);}}>
+              {SLOTS.map(function(s){return <option key={s} value={s}>{s}</option>;})}
+            </select>
+          </div>
+        </div>
+
+        <button type="button" onClick={applyPat} style={{...S.btn("cyan"),width:"100%",marginBottom:13,padding:"9px"}}>
+          Aplicar patron a todo {MO[mo]}
+        </button>
+
+        <label style={{...S.lbl,fontWeight:700}}>BLOQUEAR DIAS ESPECIFICOS</label>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <button type="button" onClick={function(){mo===0?(setMo(11),setYr(function(y){return y-1;})):setMo(function(m){return m-1;});}} style={{background:"none",border:"none",color:C.accent,fontSize:20,cursor:"pointer"}}>‹</button>
+          <b style={{fontSize:13}}>{MO[mo]} {yr}</b>
+          <button type="button" onClick={function(){mo===11?(setMo(0),setYr(function(y){return y+1;})):setMo(function(m){return m+1;});}} style={{background:"none",border:"none",color:C.accent,fontSize:20,cursor:"pointer"}}>›</button>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:4}}>
+          {DY.map(function(d){return <div key={d} style={{textAlign:"center",fontSize:9,color:C.muted,paddingBottom:3}}>{d}</div>;})}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:12}}>
+          {days.map(function(d,i){
+            if(!d)return <div key={i}/>;
+            var ds=ts(d),iw=wd.indexOf(d.getDay())>=0,ib=bl[ds],ip=ds<today();
+            return <div key={i} onClick={function(){if(!ip)togBlock(ds);}}
+              style={{background:!iw||ib?"#1a0808":C.card,border:"1px solid "+(!iw||ib?C.err+"55":C.border),borderRadius:7,padding:"6px 0",textAlign:"center",fontSize:11,color:!iw||ib?C.err:ip?C.muted:C.text,cursor:ip?"default":"pointer",opacity:ip?0.4:1}}>
+              {d.getDate()}{(!iw||ib)&&<div style={{fontSize:7}}>🔒</div>}
+            </div>;
+          })}
+        </div>
+
+        <div style={{background:"#161e2a",borderRadius:11,padding:"10px 13px",marginBottom:13}}>
+          <b style={{fontSize:12,color:C.accent}}>Resumen del mes</b>
+          <div style={{display:"flex",gap:16,marginTop:8}}>
+            {[[avDays,"Dias disponibles",C.ok],[(days.filter(function(d){return d;}).length-avDays),"Bloqueados",C.err],[avDays*slots,"Slots totales",C.accent]].map(function(x){
+              return <div key={x[1]} style={{textAlign:"center"}}>
+                <div style={{fontSize:18,fontWeight:900,color:x[2]}}>{x[0]}</div>
+                <div style={{fontSize:9,color:C.muted}}>{x[1]}</div>
+              </div>;
+            })}
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:10}}>
+          <button type="button" style={{...S.btn("ghost"),flex:1}} onClick={p.close}>Cancelar</button>
+          <button type="button" style={{...S.btn(),flex:2}} onClick={save}>Guardar horario</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── REPORTES ──────────────────────────────────────────────────── */
+function Reportes(p){
+  var appts=p.appts,sales=p.sales,clients=p.clients,users=p.users,isAdmin=p.isAdmin;
+  var ps=_useState("month");var period=ps[0];var setPeriod=ps[1];
+  var ss=_useState("all");var stf=ss[0];var setStf=ss[1];
+  var now=new Date(),tm=now.toISOString().slice(0,7),lm=new Date(now.getFullYear(),now.getMonth()-1,1).toISOString().slice(0,7),ty=now.getFullYear().toString();
+
+  function pf(ds){if(!ds)return false;if(period==="week")return (now-new Date(ds))/(864e5)<=7;if(period==="month")return ds.indexOf(tm)===0;if(period==="lastmonth")return ds.indexOf(lm)===0;if(period==="year")return ds.indexOf(ty)===0;return true;}
+  var fa=appts.filter(function(a){return pf(a.date)&&(stf==="all"||a.stId===stf);});
+  var fs=sales.filter(function(s){return pf(s.date);});
+  var ing=fs.reduce(function(a,s){return a+s.total;},0);
+  var tc=fa.length,conf=fa.filter(function(a){return a.status==="confirmado";}).length;
+  var pend=fa.filter(function(a){return a.status==="pendiente";}).length;
+  var walk=fa.filter(function(a){return a.status==="walk_in";}).length;
+  var canc=fa.filter(function(a){return a.status==="cancelado";}).length;
+  var tasa=tc>0?Math.round(conf/tc*100):0;
+  var tkt=fs.length>0?Math.round(ing/fs.length):0;
+  var sc={};fa.filter(function(a){return a.status==="confirmado"||a.status==="walk_in";}).forEach(function(a){if(a.svc)sc[a.svc]=(sc[a.svc]||0)+1;});
+  var top=Object.entries(sc).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+  var pm={};fs.forEach(function(s){pm[s.method]=(pm[s.method]||0)+s.total;});
+  var staffL=users.filter(function(u){return u.role==="barbero"||u.role==="tatuador";});
+  var sp=staffL.map(function(u){return{name:u.name,id:u.id,n:fa.filter(function(a){return a.stId===u.id&&(a.status==="confirmado"||a.status==="walk_in");}).length};}).sort(function(a,b){return b.n-a.n;});
+  var mc=Math.max.apply(null,sp.map(function(x){return x.n;}).concat([1]));
+  var bd=[0,0,0,0,0,0,0];fa.forEach(function(a){if(a.date)bd[new Date(a.date).getDay()]++;});
+  var md=Math.max.apply(null,bd.concat([1]));
+  var PL={week:"Esta semana",month:"Este mes",lastmonth:"Mes anterior",year:"Este ano",all:"Todo"};
+
+  return (
+    <div>
+      <b style={{fontSize:15,color:C.accent}}>📊 Reportes</b>
+      <div style={{display:"flex",gap:4,marginTop:10,marginBottom:7,overflowX:"auto",paddingBottom:3}}>
+        {[["week","7 dias"],["month","Este mes"],["lastmonth","Mes ant."],["year","Este ano"],["all","Todo"]].map(function(x){
+          return <button type="button" key={x[0]} onClick={function(){setPeriod(x[0]);}} style={{...S.btn(period===x[0]?"gold":"ghost"),padding:"4px 8px",fontSize:10,whiteSpace:"nowrap",flexShrink:0,color:period===x[0]?"#000":C.muted}}>{x[1]}</button>;
+        })}
+      </div>
+      {isAdmin&&<div style={{display:"flex",gap:4,marginBottom:12,overflowX:"auto",paddingBottom:3}}>
+        <button type="button" onClick={function(){setStf("all");}} style={{...S.btn(stf==="all"?"cyan":"ghost"),padding:"4px 8px",fontSize:10,whiteSpace:"nowrap",flexShrink:0,color:stf==="all"?"#000":C.muted}}>Todos</button>
+        {staffL.map(function(u){return <button type="button" key={u.id} onClick={function(){setStf(u.id);}} style={{...S.btn(stf===u.id?"cyan":"ghost"),padding:"4px 8px",fontSize:10,whiteSpace:"nowrap",flexShrink:0,color:stf===u.id?"#000":C.muted}}>{u.name.split(" ")[0]}</button>;})}
+      </div>}
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:11}}>
+        {[["💰","Ingresos","$"+ing,C.accent],["📅","Citas",tc,C.cyan],["🎯","Confirmacion",tasa+"%",C.ok],["🎫","Ticket","$"+tkt,C.warn]].map(function(x){
+          return <div key={x[1]} style={{background:x[3]+"18",border:"1px solid "+x[3]+"33",borderRadius:11,padding:"11px"}}>
+            <div style={{fontSize:17}}>{x[0]}</div>
+            <div style={{fontSize:19,fontWeight:900,color:x[3],marginTop:3}}>{x[2]}</div>
+            <div style={{fontSize:10,color:C.muted}}>{x[1]}</div>
+          </div>;
+        })}
+      </div>
+
+      <div style={{...S.card,marginBottom:10}}>
+        <b style={{fontSize:12}}>📋 Estado de citas — {PL[period]}</b>
+        <div style={{marginTop:9}}>
+          {[[conf,"Confirmadas",C.cyan],[pend,"Pendientes",C.warn],[walk,"Walk-ins",C.ok],[canc,"Canceladas",C.err]].map(function(x){
+            var pc=tc>0?Math.round(x[0]/tc*100):0;
+            return <div key={x[1]} style={{marginBottom:7}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+                <span style={{fontSize:11,color:x[2],fontWeight:600}}>{x[1]}</span>
+                <span style={{fontSize:11,color:C.muted}}>{x[0]} ({pc}%)</span>
+              </div>
+              <div style={{background:C.border,borderRadius:20,height:5}}><div style={{width:pc+"%",height:"100%",background:x[2],borderRadius:20}}/></div>
+            </div>;
+          })}
+        </div>
+      </div>
+
+      <div style={{...S.card,marginBottom:10}}>
+        <b style={{fontSize:12}}>✂ Servicios mas solicitados</b>
+        <div style={{marginTop:9}}>
+          {top.length===0&&<div style={{color:C.muted,fontSize:12,textAlign:"center",padding:10}}>Sin datos</div>}
+          {top.map(function(x,i){var pc=Math.round(x[1]/Math.max(top[0][1],1)*100);var md=i===0?"🥇":i===1?"🥈":i===2?"🥉":"  ";
+            return <div key={x[0]} style={{marginBottom:7}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+                <span style={{fontSize:11}}>{md} {x[0]}</span>
+                <b style={{fontSize:11,color:C.accent}}>{x[1]}</b>
+              </div>
+              <div style={{background:C.border,borderRadius:20,height:5}}><div style={{width:pc+"%",height:"100%",background:"linear-gradient(90deg,"+C.accent+","+C.cyan+")",borderRadius:20}}/></div>
+            </div>;
+          })}
+        </div>
+      </div>
+
+      <div style={{...S.card,marginBottom:10}}>
+        <b style={{fontSize:12}}>👤 Rendimiento por profesional</b>
+        <div style={{marginTop:9}}>
+          {sp.map(function(x){var pc=Math.round(x.n/mc*100);
+            return <div key={x.id} style={{marginBottom:7}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
+                <span style={{fontSize:11}}>{x.name}</span>
+                <b style={{fontSize:11,color:C.cyan}}>{x.n} citas</b>
+              </div>
+              <div style={{background:C.border,borderRadius:20,height:5}}><div style={{width:pc+"%",height:"100%",background:C.cyan,borderRadius:20}}/></div>
+            </div>;
+          })}
+        </div>
+      </div>
+
+      <div style={{...S.card,marginBottom:10}}>
+        <b style={{fontSize:12}}>📆 Dias mas ocupados</b>
+        <div style={{display:"flex",gap:3,alignItems:"flex-end",height:70,marginTop:10,padding:"0 4px"}}>
+          {["Do","Lu","Ma","Mi","Ju","Vi","Sa"].map(function(d,i){var hv=bd[i],pc=Math.round(hv/md*100),top=hv===Math.max.apply(null,bd);
+            return <div key={d} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+              <div style={{fontSize:8,color:top?C.accent:C.muted,fontWeight:top?700:400}}>{hv||""}</div>
+              <div style={{width:"100%",borderRadius:"3px 3px 0 0",background:top?"linear-gradient(180deg,"+C.accent+","+C.cyan+")":C.border,height:Math.max(3,Math.round(pc*0.52))+"px"}}/>
+              <div style={{fontSize:8,color:top?C.accent:C.muted,fontWeight:top?700:400}}>{d}</div>
+            </div>;
+          })}
+        </div>
+      </div>
+
+      <div style={{...S.card,marginBottom:10}}>
+        <b style={{fontSize:12}}>💳 Metodos de pago</b>
+        {Object.entries(pm).length===0&&<div style={{color:C.muted,fontSize:12,textAlign:"center",padding:10}}>Sin ventas</div>}
+        {Object.entries(pm).map(function(x){
+          return <div key={x[0]} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid "+C.border}}>
+            <span style={{fontSize:12}}>{x[0]==="efectivo"?"💵 Efectivo":x[0]==="tarjeta"?"💳 Tarjeta":x[0]==="pendiente"?"⏳ Pendiente":"🏦 "+x[0]}</span>
+            <b style={{color:C.accent}}>${x[1]}</b>
+          </div>;
+        })}
+      </div>
+
+      <div style={{...S.card,marginBottom:10}}>
+        <b style={{fontSize:12}}>👥 Clientes</b>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginTop:9}}>
+          {[[clients.length,"Total",C.text],[clients.filter(function(c){return pf(c.since||"");}).length,"Nuevos",C.ok],[new Set(fa.map(function(a){return a.client;})).size,"Atendidos",C.cyan]].map(function(x){
+            return <div key={x[1]} style={{textAlign:"center",background:"#161e2a",borderRadius:9,padding:"9px 5px"}}>
+              <div style={{fontSize:19,fontWeight:900,color:x[2]}}>{x[0]}</div>
+              <div style={{fontSize:9,color:C.muted}}>{x[1]}</div>
+            </div>;
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VISTA PUBLICA
+═══════════════════════════════════════════════════════════════ */
+function Public(p){
+  var svcs=p.svcs,appts=p.appts,users=p.users,clients=p.clients,cfg=p.cfg,onBook=p.onBook,onAdmin=p.onAdmin,onReg=p.onReg;
+  var stampsOn=cfg&&cfg.stampsOn;
+
+  var tabs=_useState("booking");var ptab=tabs[0];var setPtab=tabs[1];
+  var stepS=_useState(1);var step=stepS[0];var setStep=stepS[1];
+  var svcS=_useState(null);var svc=svcS[0];var setSvc=svcS[1];
+  var stfS=_useState(null);var stf=stfS[0];var setStf=stfS[1];
+  var dtS=_useState(null);var dt=dtS[0];var setDt=dtS[1];
+  var tmS=_useState(null);var tm=tmS[0];var setTm=tmS[1];
+  var nmS=_useState("");var nm=nmS[0];var setNm=nmS[1];
+  var phS=_useState("");var ph=phS[0];var setPh=phS[1];
+  var errS=_useState("");var err=errS[0];var setErr=errS[1];
+  var cfS=_useState(null);var clientFound=cfS[0];var setClientFound=cfS[1];
+  var yrS=_useState(new Date().getFullYear());var yr=yrS[0];var setYr=yrS[1];
+  var moS=_useState(new Date().getMonth());var mo=moS[0];var setMo=moS[1];
+
+  var rnS=_useState("");var rn=rnS[0];var setRn=rnS[1];
+  var rpS=_useState("");var rp=rpS[0];var setRp=rpS[1];
+  var reS=_useState("");var re=reS[0];var setRe=reS[1];
+  var rbS=_useState("");var rb=rbS[0];var setRb=rbS[1];
+  var rerrS=_useState("");var rerr=rerrS[0];var setRerr=rerrS[1];
+  var rdoneS=_useState(false);var rdone=rdoneS[0];var setRdone=rdoneS[1];
+
+  var lpS=_useState("");var lp=lpS[0];var setLp=lpS[1];
+  var lvS=_useState(false);var lv=lvS[0];var setLv=lvS[1];
+
+  var staffL=users.filter(function(u){return u.role==="barbero"||u.role==="tatuador";});
+
+  function slotOk(d,sl){
+    if(!stf)return false;
+    var ds=ts(d);if(ds<today())return false;
+    if(!stf.workDays||stf.workDays.indexOf(d.getDay())<0)return false;
+    var sm=pt(sl);if(sm<pt(stf.wStart||"09:00")||sm>=pt(stf.wEnd||"19:00"))return false;
+    var bl=stf.blocks&&stf.blocks[ds];if(bl===true)return false;
+    return !appts.some(function(a){return a.stId===stf.id&&a.date===ds&&a.time===sl;});
+  }
+
+  function dayOk(d){
+    if(!stf)return false;
+    var ds=ts(d);if(ds<today())return false;
+    if(!stf.workDays||stf.workDays.indexOf(d.getDay())<0)return false;
+    var bl=stf.blocks&&stf.blocks[ds];if(bl===true)return false;
+    return SLOTS.some(function(sl){return slotOk(d,sl);});
+  }
+
+  var avSlots={m:[],a:[]};
+  if(stf&&dt){SLOTS.forEach(function(sl){if(slotOk(dt,sl)){if(pt(sl)<13*60)avSlots.m.push(sl);else avSlots.a.push(sl);}});}
+
+  async function confirm(){
+    if(!nm){setErr("Ingresa tu nombre");return;}
+    if(!vPhone(ph)){setErr("El telefono debe tener exactamente 10 digitos");return;}
+    var a={id:"a"+Date.now(),client:nm,phone:ph,svc:svc?svc.name:"",svcId:svc?svc.id:"",stId:stf?stf.id:null,date:ts(dt),time:tm,status:"pendiente",dur:svc?svc.dur:30};
+
+    /* Si es cliente nuevo, registrarlo automáticamente */
+    var cliData=clientFound;
+    if(!clientFound){
+      var newCli={id:"c"+Date.now(),name:nm,phone:ph,email:"",visits:0,last:"-",stamps:0,pts:0,since:today()};
+      cliData=newCli;
+      onReg(newCli);
+      try{await DB.save("clients",newCli.id,newCli);}catch(e){}
+    } else {
+      /* Actualizar última visita */
+      var updCli=Object.assign({},clientFound,{visits:(clientFound.visits||0)+1,last:today()});
+      onReg(updCli);
+      try{await DB.save("clients",updCli.id,updCli);}catch(e){}
+    }
+
+    /* Mostrar éxito inmediatamente */
+    onBook(a);
+    setStep(5);
+
+    /* Guardar cita en background */
+    try{await DB.save("appointments",a.id,a);}catch(e){console.error(e);}
+
+    /* Programar recordatorio por email 1 hora antes */
+    var staffName=stf?stf.name:"Tu profesional";
+    scheduleReminder(a,cliData,staffName);
+  }
+
+  async function doReg(){
+    setRerr("");
+    if(!rn){setRerr("El nombre es obligatorio");return;}
+    if(!vPhone(rp)){setRerr("El telefono debe tener exactamente 10 digitos");return;}
+    for(var i=0;i<clients.length;i++){if(clients[i].phone===rp){setRerr("Ya existe una cuenta con ese numero");return;}}
+    var cl={id:"c"+Date.now(),name:rn,phone:rp,email:re,bday:rb,visits:0,last:"-",stamps:0,pts:0,since:today()};
+    await DB.save("clients",cl.id,cl);
+    onReg(cl);setRdone(true);setLp(rp);
+  }
+
+  var loyClient=null;
+  if(lv&&lp){for(var i=0;i<clients.length;i++){if(clients[i].phone===lp){loyClient=clients[i];break;}}}
+  var loyAppts=loyClient?appts.filter(function(a){return a.client===loyClient.name||a.phone===loyClient.phone;}).slice().reverse().slice(0,5):[];
+
+  var days=calDays(yr,mo);
+
+  var pubTabs=[["booking","📅 Agendar"],["registro","📝 Registro"]];
+  if(stampsOn)pubTabs.push(["loyalty","🎫 Mi tarjeta"]);
+
+  return (
+    <div style={S.app}>
+      <div style={{background:"linear-gradient(160deg,#080c10,#0d1a28)",padding:"24px 20px 18px",textAlign:"center",borderBottom:"1px solid "+C.border}}>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:8}}><Logo size={60}/></div>
+        <div style={{fontSize:24,fontWeight:900,background:"linear-gradient(90deg,#c9a84c,#4ecdc4)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",letterSpacing:4}}>TASECA</div>
+        <div style={{fontSize:10,color:C.cyan,letterSpacing:3}}>BARBER & TATTOO STUDIO</div>
+      </div>
+
+      <div style={{display:"flex",borderBottom:"1px solid "+C.border}}>
+        {pubTabs.map(function(x){return <button type="button" key={x[0]} onClick={function(){setPtab(x[0]);}} style={{flex:1,padding:"9px 3px",background:"none",border:"none",borderBottom:"2px solid "+(ptab===x[0]?C.accent:"transparent"),color:ptab===x[0]?C.accent:C.muted,fontWeight:ptab===x[0]?700:400,fontSize:11,cursor:"pointer"}}>{x[1]}</button>;})}
+      </div>
+
+      {/* TAB REGISTRO */}
+      {ptab==="registro"&&(
+        <div style={{padding:"16px 14px 80px"}}>
+          {!rdone&&(
+            <div>
+              <div style={{textAlign:"center",marginBottom:16}}>
+                <div style={{fontSize:36,marginBottom:6}}>📝</div>
+                <div style={{fontWeight:700,fontSize:15,color:C.accent,marginBottom:3}}>Crear mi cuenta</div>
+                <div style={{color:C.muted,fontSize:12}}>Registrate gratis y acumula beneficios</div>
+              </div>
+              {stampsOn&&<div style={{background:C.accent+"11",borderRadius:11,padding:"9px 12px",marginBottom:14,fontSize:12,color:C.muted}}>
+                Con tu cuenta acumulas sellos — <b style={{color:C.accent}}>10 servicios = 1 gratis 🎁</b>
+              </div>}
+              <Field label="Nombre completo *" val={rn} set={setRn} ph="Carlos Perez"/>
+              <PhoneInput val={rp} set={setRp}/>
+              <Field label="Email (opcional)" val={re} set={setRe} ph="carlos@email.com" type="email"/>
+              <Field label="Fecha de cumpleanos (opcional)" val={rb} set={setRb} type="date"/>
+              {rerr&&<div style={{background:C.err+"22",border:"1px solid "+C.err+"44",borderRadius:9,padding:"8px 11px",fontSize:12,color:C.err,marginBottom:10}}>⚠️ {rerr}</div>}
+              <button type="button" style={{...S.btn("cyan"),width:"100%",color:"#000",padding:"12px",fontSize:14}} onClick={doReg}>Crear mi cuenta →</button>
+              {stampsOn&&<div style={{textAlign:"center",marginTop:12,fontSize:12,color:C.muted}}>Ya tienes cuenta? <span style={{color:C.accent,cursor:"pointer",fontWeight:700}} onClick={function(){setPtab("loyalty");}}>Ver mi tarjeta</span></div>}
+            </div>
+          )}
+          {rdone&&(
+            <div style={{textAlign:"center",padding:"28px 14px"}}>
+              <div style={{fontSize:50,marginBottom:12}}>🎉</div>
+              <div style={{fontSize:19,fontWeight:900,color:C.ok,marginBottom:7}}>Cuenta creada!</div>
+              <div style={{color:C.muted,fontSize:13,lineHeight:1.8,marginBottom:18}}>Bienvenido <b style={{color:C.text}}>{rn}</b>!<br/>Ya puedes acumular beneficios en cada visita</div>
+              {stampsOn&&<StampCard n={0}/>}
+              <div style={{display:"flex",gap:10,marginTop:14}}>
+                {stampsOn&&<button type="button" style={{...S.btn("ghost"),flex:1}} onClick={function(){setRdone(false);setPtab("loyalty");}}>Ver tarjeta</button>}
+                <button type="button" style={{...S.btn(),flex:1,color:"#000"}} onClick={function(){setRdone(false);setRn("");setRp("");setRe("");setRb("");setRerr("");setPtab("booking");}}>Agendar cita</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB LOYALTY */}
+      {ptab==="loyalty"&&stampsOn&&(
+        <div style={{padding:"16px 14px 80px"}}>
+          {!lv&&(
+            <div>
+              <div style={{textAlign:"center",marginBottom:16}}>
+                <div style={{fontSize:34,marginBottom:6}}>🎫</div>
+                <div style={{fontWeight:700,fontSize:15,color:C.accent,marginBottom:3}}>Tu tarjeta de fidelidad</div>
+                <div style={{color:C.muted,fontSize:12}}>Acumula sellos y gana servicios gratis</div>
+              </div>
+              <div style={{...S.card,marginBottom:10}}>
+                <b style={{color:C.accent,fontSize:12}}>🔍 Ya tengo cuenta</b>
+                <div style={{marginTop:9}}><PhoneInput val={lp} set={setLp}/></div>
+                <button type="button" style={{...S.btn(),width:"100%"}} onClick={function(){setLv(true);}}>Ver mi tarjeta →</button>
+              </div>
+              <div style={{...S.card,border:"1px solid "+C.cyan+"44"}}>
+                <b style={{color:C.cyan,fontSize:12}}>✨ Quiero registrarme</b>
+                <div style={{color:C.muted,fontSize:12,marginTop:5,marginBottom:9}}>Crea tu perfil y empieza a acumular hoy</div>
+                <button type="button" style={{...S.btn("cyan"),width:"100%",color:"#000"}} onClick={function(){setPtab("registro");}}>Crear perfil gratis</button>
+              </div>
+            </div>
+          )}
+          {lv&&(
+            <div>
+              <button type="button" onClick={function(){setLv(false);}} style={{background:"none",border:"none",color:C.muted,fontSize:12,cursor:"pointer",marginBottom:12}}>← Volver</button>
+              {!loyClient&&<div style={{textAlign:"center",padding:28,color:C.muted,fontSize:13}}>No encontramos cuenta con ese numero</div>}
+              {loyClient&&(
+                <div>
+                  <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+                    <div style={{width:48,height:48,borderRadius:"50%",background:"linear-gradient(135deg,"+C.accent+","+C.cyan+")",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:900,color:"#000"}}>{loyClient.name[0]}</div>
+                    <div>
+                      <div style={{fontSize:17,fontWeight:900}}>{loyClient.name}</div>
+                      <div style={{color:C.muted,fontSize:12}}>{loyClient.visits||0} visitas</div>
+                    </div>
+                  </div>
+                  <StampCard n={loyClient.stamps||0}/>
+                  <PtsBar pts={loyClient.pts||0}/>
+                  <b style={{fontSize:12,color:C.accent,display:"block",marginTop:14,marginBottom:9}}>📋 Mis ultimas citas</b>
+                  {loyAppts.length===0&&<div style={{color:C.muted,textAlign:"center",padding:14,fontSize:12}}>Sin citas</div>}
+                  {loyAppts.map(function(a){return <div key={a.id} style={{...S.card,marginBottom:7}}>
+                    <div style={S.row}>
+                      <div><b style={{fontSize:12}}>{a.svc}</b><div style={{color:C.muted,fontSize:11}}>{a.date} · {a.time}</div></div>
+                      <span style={S.badge(SC[a.status]||C.muted)}>{SL[a.status]||a.status}</span>
+                    </div>
+                  </div>;})}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB BOOKING */}
+      {ptab==="booking"&&(
+        <div style={{padding:"14px 13px 90px"}}>
+          {step<5&&<div style={{display:"flex",gap:4,marginBottom:14}}>{[1,2,3,4].map(function(i){return <div key={i} style={{flex:1,height:3,borderRadius:3,background:step>i?C.accent:step===i?C.accent+"66":C.border}}/>;})}</div>}
+
+          {step===1&&<div>
+            <b style={{fontSize:14,color:C.accent,display:"block",marginBottom:11}}>Que servicio necesitas?</b>
+            {svcs.map(function(sv){return <div key={sv.id} onClick={function(){setSvc(sv);}} style={{background:svc&&svc.id===sv.id?C.accent+"18":C.card,border:"1.5px solid "+(svc&&svc.id===sv.id?C.accent:C.border),borderRadius:12,padding:"11px 13px",marginBottom:7,cursor:"pointer"}}>
+              <div style={S.row}>
+                <div><b style={{fontSize:13}}>{sv.name}</b><div style={{color:C.muted,fontSize:11,marginTop:1}}>⏱ {sv.dur||sv.duration||0} min</div></div>
+                <b style={{color:C.accent,fontSize:15}}>${sv.price}</b>
+              </div>
+            </div>;})}
+            <button type="button" style={{...S.btn(),width:"100%",marginTop:7,opacity:svc?1:0.4}} disabled={!svc} onClick={function(){setStep(2);}}>Continuar →</button>
+          </div>}
+
+          {step===2&&<div>
+            <b style={{fontSize:14,color:C.accent,display:"block",marginBottom:4}}>Elige tu profesional</b>
+            <div style={{color:C.muted,fontSize:11,marginBottom:11}}>{svc&&svc.name}</div>
+            {staffL.map(function(u){return <div key={u.id} onClick={function(){setStf(u);setDt(null);setTm(null);}} style={{background:stf&&stf.id===u.id?C.cyan+"18":C.card,border:"1.5px solid "+(stf&&stf.id===u.id?C.cyan:C.border),borderRadius:12,padding:"11px 13px",marginBottom:7,cursor:"pointer",display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:38,height:38,borderRadius:"50%",background:C.accent+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,overflow:"hidden",flexShrink:0}}>
+                {u.photo?<img src={u.photo} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:u.name[0]}
+              </div>
+              <div><b style={{fontSize:13}}>{u.name}</b><div style={{color:C.muted,fontSize:11}}>{ROLES[u.role]}</div></div>
+              {stf&&stf.id===u.id&&<div style={{marginLeft:"auto",color:C.cyan,fontSize:17}}>✓</div>}
+            </div>;})}
+            <div style={{display:"flex",gap:9}}>
+              <button type="button" style={{...S.btn("ghost"),flex:1}} onClick={function(){setStep(1);}}>← Volver</button>
+              <button type="button" style={{...S.btn(),flex:2,opacity:stf?1:0.4}} disabled={!stf} onClick={function(){setStep(3);}}>Continuar →</button>
+            </div>
+          </div>}
+
+          {step===3&&<div>
+            <b style={{fontSize:14,color:C.accent,display:"block",marginBottom:4}}>Elige fecha y hora</b>
+            <div style={{color:C.muted,fontSize:11,marginBottom:11}}>Con: <b style={{color:C.text}}>{stf&&stf.name}</b></div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}>
+              <button type="button" onClick={function(){mo===0?(setMo(11),setYr(function(y){return y-1;})):setMo(function(m){return m-1;});}} style={{background:"none",border:"none",color:C.accent,fontSize:20,cursor:"pointer"}}>‹</button>
+              <b style={{fontSize:13}}>{MO[mo]} {yr}</b>
+              <button type="button" onClick={function(){mo===11?(setMo(0),setYr(function(y){return y+1;})):setMo(function(m){return m+1;});}} style={{background:"none",border:"none",color:C.accent,fontSize:20,cursor:"pointer"}}>›</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:4}}>
+              {DY.map(function(d){return <div key={d} style={{textAlign:"center",fontSize:9,color:C.muted,paddingBottom:3}}>{d}</div>;})}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3,marginBottom:11}}>
+              {days.map(function(d,i){
+                if(!d)return <div key={i}/>;
+                var ok=dayOk(d),sel=dt&&ts(d)===ts(dt);
+                return <div key={i} onClick={function(){if(ok){setDt(d);setTm(null);}}}
+                  style={{background:sel?"linear-gradient(135deg,#c9a84c,#4ecdc4)":ok?C.card:"#080c10",border:"1px solid "+(sel?"transparent":C.border),borderRadius:8,padding:"7px 0",textAlign:"center",cursor:ok?"pointer":"default",color:sel?"#000":ok?C.text:C.border,fontSize:11,fontWeight:sel?700:400}}>
+                  {d.getDate()}{ok&&!sel&&<div style={{width:4,height:4,borderRadius:"50%",background:C.ok,margin:"1px auto 0"}}/>}
+                </div>;
+              })}
+            </div>
+            {dt&&<div>
+              <b style={{fontSize:12,color:C.cyan,display:"block",marginBottom:7}}>{dt.getDate()} de {MO[dt.getMonth()]}</b>
+              {avSlots.m.length>0&&<div>
+                <div style={{fontSize:10,color:C.muted,marginBottom:5}}>🌅 Manana</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4,marginBottom:9}}>
+                  {avSlots.m.map(function(sl){return <div key={sl} onClick={function(){setTm(sl);}} style={{padding:"7px 3px",borderRadius:7,border:"1px solid "+(tm===sl?C.accent:C.border),background:tm===sl?C.accent+"22":"transparent",color:tm===sl?C.accent:C.muted,cursor:"pointer",fontSize:11,textAlign:"center",fontWeight:tm===sl?700:400}}>{sl}</div>;})}
+                </div>
+              </div>}
+              {avSlots.a.length>0&&<div>
+                <div style={{fontSize:10,color:C.muted,marginBottom:5}}>🌆 Tarde</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4,marginBottom:9}}>
+                  {avSlots.a.map(function(sl){return <div key={sl} onClick={function(){setTm(sl);}} style={{padding:"7px 3px",borderRadius:7,border:"1px solid "+(tm===sl?C.accent:C.border),background:tm===sl?C.accent+"22":"transparent",color:tm===sl?C.accent:C.muted,cursor:"pointer",fontSize:11,textAlign:"center",fontWeight:tm===sl?700:400}}>{sl}</div>;})}
+                </div>
+              </div>}
+            </div>}
+            <div style={{display:"flex",gap:9}}>
+              <button type="button" style={{...S.btn("ghost"),flex:1}} onClick={function(){setStep(2);}}>← Volver</button>
+              <button type="button" style={{...S.btn(),flex:2,opacity:dt&&tm?1:0.4}} disabled={!(dt&&tm)} onClick={function(){setStep(4);}}>Continuar →</button>
+            </div>
+          </div>}
+
+          {step===4&&<div>
+            <b style={{fontSize:14,color:C.accent,display:"block",marginBottom:11}}>Tus datos</b>
+            <div style={{...S.card,border:"1px solid "+C.accent+"44",marginBottom:13}}>
+              {[["Servicio",svc&&svc.name||""],["Profesional",stf&&stf.name||""],["Fecha",dt?dt.getDate()+" de "+MO[dt.getMonth()]:""],["Hora",tm||""]].map(function(x){return <div key={x[0]} style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:4}}>
+                <span style={{color:C.muted}}>{x[0]}</span><b style={{color:x[0]==="Hora"?C.accent:C.text}}>{x[1]}</b>
+              </div>;})}
+            </div>
+
+            {/* TELEFONO PRIMERO - auto-rellena nombre */}
+            <PhoneInput label="Telefono (10 digitos) *" val={ph} set={function(v){
+              setPh(v);
+              if(v.length===10){
+                var found=null;
+                for(var i=0;i<clients.length;i++){if(clients[i].phone===v){found=clients[i];break;}}
+                if(found){
+                  setNm(found.name);
+                  setClientFound(found);
+                } else {
+                  setClientFound(null);
+                }
+              } else {
+                setClientFound(null);
+              }
+            }}/>
+
+            {clientFound&&<div style={{background:C.ok+"18",border:"1px solid "+C.ok+"44",borderRadius:9,padding:"9px 12px",marginBottom:9,display:"flex",alignItems:"center",gap:9}}>
+              <div style={{width:32,height:32,borderRadius:"50%",background:"linear-gradient(135deg,"+C.accent+","+C.cyan+")",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:900,color:"#000",flexShrink:0}}>{clientFound.name[0]}</div>
+              <div>
+                <div style={{fontWeight:700,fontSize:13,color:C.ok}}>✓ Cliente encontrado</div>
+                <div style={{fontSize:11,color:C.muted}}>{clientFound.name} · {clientFound.visits||0} visitas · {clientFound.stamps||0} sellos</div>
+              </div>
+            </div>}
+
+            {!clientFound&&ph.length===10&&<div style={{background:C.warn+"18",border:"1px solid "+C.warn+"44",borderRadius:9,padding:"9px 12px",marginBottom:9,fontSize:12,color:C.warn}}>
+              📋 Numero nuevo — completa tu nombre para registrarte
+            </div>}
+
+            <Field label="Nombre completo *" val={nm} set={setNm} ph="Carlos Perez"/>
+
+            {err&&<div style={{background:C.err+"22",border:"1px solid "+C.err+"44",borderRadius:9,padding:"8px 11px",fontSize:12,color:C.err,marginBottom:9}}>⚠️ {err}</div>}
+            <div style={{display:"flex",gap:9}}>
+              <button type="button" style={{...S.btn("ghost"),flex:1}} onClick={function(){setStep(3);}}>← Volver</button>
+              <button type="button" style={{...S.btn(),flex:2}} onClick={confirm}>Confirmar ✓</button>
+            </div>
+          </div>}
+
+          {step===5&&<div style={{textAlign:"center",padding:"26px 12px"}}>
+            <div style={{fontSize:50,marginBottom:11}}>🎉</div>
+            <div style={{fontSize:18,fontWeight:900,background:"linear-gradient(90deg,#c9a84c,#4ecdc4)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",marginBottom:9}}>Cita agendada!</div>
+            <div style={{color:C.muted,fontSize:12,lineHeight:1.9,marginBottom:18}}>
+              <b style={{color:C.text}}>{nm}</b>, tu cita de <b style={{color:C.text}}>{svc&&svc.name}</b><br/>
+              con <b style={{color:C.text}}>{stf&&stf.name}</b><br/>
+              el <b style={{color:C.accent}}>{dt&&dt.getDate()} de {dt&&MO[dt.getMonth()]} a las {tm}</b>
+            </div>
+            <button type="button" style={{...S.btn(),width:"100%",color:"#000"}} onClick={function(){setStep(1);setSvc(null);setStf(null);setDt(null);setTm(null);setNm("");setPh("");setErr("");setClientFound(null);}}>Agendar otra cita</button>
+          </div>}
+        </div>
+      )}
+
+      <button type="button" onClick={onAdmin} style={{position:"fixed",bottom:14,right:13,background:C.card,border:"1px solid "+C.border,borderRadius:20,padding:"5px 11px",color:C.muted,fontSize:11,cursor:"pointer"}}>🔒 Staff</button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LOGIN
+═══════════════════════════════════════════════════════════════ */
+function Login(p){
+  var selS=_useState(null);var sel=selS[0];var setSel=selS[1];
+  var pinS=_useState("");var pin=pinS[0];var setPin=pinS[1];
+  var errS=_useState("");var err=errS[0];var setErr=errS[1];
+  function tap(d){
+    if(pin.length>=4)return;
+    var np=pin+d;setPin(np);
+    if(np.length===4)setTimeout(function(){if(np===sel.pin)p.onLogin(sel);else{setErr("PIN incorrecto");setPin("");}},200);
+  }
+  return (
+    <div style={{...S.app,display:"flex",flexDirection:"column"}}>
+      <div style={{padding:"38px 20px 18px",textAlign:"center"}}>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:9}}><Logo size={48}/></div>
+        <b style={{fontSize:19,color:C.accent,display:"block",marginBottom:3}}>Acceso Staff</b>
+        <div style={{fontSize:11,color:C.muted}}>Taseca · Barber & Tattoo</div>
+      </div>
+      <div style={{padding:"0 15px 40px",flex:1}}>
+        {!sel&&<div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:11,textAlign:"center"}}>Selecciona tu perfil</div>
+          {p.users.map(function(u){return <div key={u.id} onClick={function(){setSel(u);setPin("");setErr("");}} style={{background:C.card,border:"1px solid "+C.border,borderRadius:12,padding:"11px 13px",marginBottom:8,cursor:"pointer",display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:40,height:40,borderRadius:"50%",background:C.accent+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,overflow:"hidden",flexShrink:0}}>
+              {u.photo?<img src={u.photo} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:u.name[0]}
+            </div>
+            <div><b style={{fontSize:13}}>{u.name}</b><div style={{color:C.muted,fontSize:11}}>{ROLES[u.role]}</div></div>
+            <div style={{marginLeft:"auto",color:C.muted,fontSize:15}}>›</div>
+          </div>;})}
+          <button type="button" style={{...S.btn("ghost"),width:"100%",marginTop:7}} onClick={p.onBack}>← Inicio</button>
+        </div>}
+        {sel&&<div>
+          <div style={{textAlign:"center",marginBottom:18}}>
+            <div style={{width:48,height:48,borderRadius:"50%",background:C.accent+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,margin:"0 auto 7px",overflow:"hidden"}}>
+              {sel.photo?<img src={sel.photo} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:sel.name[0]}
+            </div>
+            <b style={{fontSize:14}}>{sel.name}</b>
+            <div style={{color:C.muted,fontSize:11,marginTop:9}}>Ingresa tu PIN</div>
+          </div>
+          <div style={{display:"flex",gap:11,justifyContent:"center",marginBottom:20}}>
+            {[0,1,2,3].map(function(i){return <div key={i} style={{width:13,height:13,borderRadius:"50%",background:i<pin.length?C.accent:C.border}}/>;  })}
+          </div>
+          {err&&<div style={{color:C.err,fontSize:12,textAlign:"center",marginBottom:9}}>{err}</div>}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,maxWidth:240,margin:"0 auto"}}>
+            {[1,2,3,4,5,6,7,8,9].map(function(n){return <button type="button" key={n} onClick={function(){tap(String(n));}} style={{background:C.card,border:"1px solid "+C.border,borderRadius:11,padding:"14px",fontSize:19,fontWeight:700,color:C.text,cursor:"pointer",textAlign:"center"}}>{n}</button>;})}
+            <button type="button" onClick={function(){setSel(null);setPin("");setErr("");}} style={{background:"transparent",border:"none",fontSize:12,color:C.muted,cursor:"pointer",padding:"14px",textAlign:"center"}}>←</button>
+            <button type="button" onClick={function(){tap("0");}} style={{background:C.card,border:"1px solid "+C.border,borderRadius:11,padding:"14px",fontSize:19,fontWeight:700,color:C.text,cursor:"pointer",textAlign:"center"}}>0</button>
+            <button type="button" onClick={function(){setPin(function(p){return p.slice(0,-1);});}} style={{background:"transparent",border:"none",fontSize:17,color:C.muted,cursor:"pointer",padding:"14px",textAlign:"center"}}>⌫</button>
+          </div>
+        </div>}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ADMIN PANEL
+═══════════════════════════════════════════════════════════════ */
+function Admin(p){
+  var user=p.user,users=p.users,setUsers=p.setUsers;
+  var svcs=p.svcs,setSvcs=p.setSvcs;
+  var prods=p.prods,setProds=p.setProds;
+  var clients=p.clients,setClients=p.setClients;
+  var appts=p.appts,setAppts=p.setAppts;
+  var sales=p.sales,setSales=p.setSales;
+  var cfg=p.cfg,setCfg=p.setCfg;
+  var onLogout=p.onLogout;
+  if(!user)return null;
+
+  var isAdmin=user.role==="admin";
+  var stampsOn=cfg&&cfg.stampsOn;
+
+  async function toggleStamps(){
+    var upd=Object.assign({},cfg,{stampsOn:!stampsOn});
+    await DB.save("config","cfg",upd);setCfg(upd);
+  }
+
+  var allTabs=[{id:"agenda",icon:"📅",label:"Agenda"},{id:"clientes",icon:"👥",label:"Clientes"},{id:"fidelidad",icon:"🎫",label:"Sellos"},{id:"catalogo",icon:"🛒",label:"Catalogo"},{id:"caja",icon:"💰",label:"Caja"},{id:"reportes",icon:"📊",label:"Reportes"},{id:"config",icon:"⚙️",label:"Config"}];
+  var allowed=RTABS[user.role]||[];
+  var tabs=allTabs.filter(function(t){return allowed.indexOf(t.id)>=0;});
+
+  var tabS=_useState(tabs[0]?tabs[0].id:"agenda");var tab=tabS[0];var setTab=tabS[1];
+  var subS=_useState("servicios");var sub=subS[0];var setSub=subS[1];
+  var mdlS=_useState(null);var mdl=mdlS[0];var setMdl=mdlS[1];
+  var schS=_useState(null);var schUser=schS[0];var setSchUser=schS[1];
+  var adetS=_useState(null);var adet=adetS[0];var setAdet=adetS[1];
+  var nslotS=_useState(null);var nslot=nslotS[0];var setNslot=nslotS[1];
+
+  var staffL=users.filter(function(u){return u.role==="barbero"||u.role==="tatuador";});
+  var initSt=isAdmin?(staffL[0]?staffL[0].id:null):user.id;
+  var stS=_useState(initSt);var selSt=stS[0];var setSelSt=stS[1];
+  var notifS=_useState([]);var notifs=notifS[0];var setNotifs=notifS[1];
+  var showNS=_useState(false);var showN=showNS[0];var setShowN=showNS[1];
+
+  _useEffect(function(){
+    if(user.role!=="admin"&&user.role!=="recepcionista")return;
+    var lastCheck=localStorage.getItem("taseca_lnc")||"0";
+    async function checkN(){
+      try{
+        var all=await DB.all("notifs");
+        var mine=all.filter(function(n){return n.forRoles&&n.forRoles.indexOf(user.role)>=0&&!n.read&&n.id>lastCheck;});
+        if(mine.length>0){
+          setNotifs(mine);setShowN(true);
+          localStorage.setItem("taseca_lnc",mine[mine.length-1].id);
+          mine.forEach(function(n){pushNotif("Taseca",n.msg);});
+        }
+      }catch(e){}
+    }
+    checkN();
+    var iv=setInterval(checkN,15000);
+    return function(){clearInterval(iv);};
+  },[]);
+
+  var totalV=sales.reduce(function(a,s){return a+s.total;},0);
+  var fab={position:"fixed",bottom:86,right:14,background:C.accent,color:"#000",border:"none",borderRadius:"50%",width:46,height:46,fontSize:21,cursor:"pointer",fontWeight:900,boxShadow:"0 4px 14px #c9a84c55",zIndex:99};
+
+  function closeM(){setMdl(null);}
+
+  /* ─── Service Modal ─── */
+  function SvcMdl(){
+    var d=mdl&&mdl.d||{};
+    var nS=_useState(d.name||"");var n=nS[0];var setN=nS[1];
+    var pS=_useState(d.price||"");var pr=pS[0];var setPr=pS[1];
+    var duS=_useState(d.dur||30);var du=duS[0];var setDu=duS[1];
+    var cS=_useState(d.cat||"barberia");var cat=cS[0];var setCat=cS[1];
+    async function save(){
+      if(!n||!pr)return;
+      var item={id:d.id||"s"+Date.now(),name:n,price:Number(pr),dur:Number(du),cat:cat};
+      d.id?setSvcs(function(x){return x.map(function(s){return s.id===d.id?item:s;});}):setSvcs(function(x){return x.concat([item]);});
+      closeM();
+      try{await DB.save("services",item.id,item);}catch(e){console.error(e);}
+    }
+    return <Mdl title={d.id?"Editar Servicio":"Nuevo Servicio"} close={closeM} save={save}>
+      <Field label="Nombre" val={n} set={setN} ph="Corte clasico"/>
+      <Field label="Precio ($)" val={pr} set={setPr} type="number" ph="15"/>
+      <Field label="Duracion (min)" val={du} set={setDu} type="number" ph="30"/>
+      <Field label="Categoria" val={cat} set={setCat} opts={[{v:"barberia",l:"Barberia"},{v:"tatuaje",l:"Tatuaje"}]}/>
+    </Mdl>;
+  }
+
+  /* ─── Product Modal ─── */
+  function ProdMdl(){
+    var d=mdl&&mdl.d||{};
+    var nS=_useState(d.name||"");var n=nS[0];var setN=nS[1];
+    var pS=_useState(d.price||"");var pr=pS[0];var setPr=pS[1];
+    var stS=_useState(d.stock||0);var st=stS[0];var setSt=stS[1];
+    async function save(){
+      if(!n||!pr)return;
+      var item={id:d.id||"p"+Date.now(),name:n,price:Number(pr),stock:Number(st)};
+      d.id?setProds(function(x){return x.map(function(s){return s.id===d.id?item:s;});}):setProds(function(x){return x.concat([item]);});
+      closeM();
+      try{await DB.save("products",item.id,item);}catch(e){console.error(e);}
+    }
+    return <Mdl title={d.id?"Editar Producto":"Nuevo Producto"} close={closeM} save={save}>
+      <Field label="Nombre" val={n} set={setN} ph="Pomada fijadora"/>
+      <Field label="Precio ($)" val={pr} set={setPr} type="number" ph="10"/>
+      <Field label="Stock" val={st} set={setSt} type="number" ph="20"/>
+    </Mdl>;
+  }
+
+  /* ─── Client Modal ─── */
+  function CliMdl(){
+    var d=mdl&&mdl.d||{};
+    var nS=_useState(d.name||"");var n=nS[0];var setN=nS[1];
+    var phS=_useState(d.phone||"");var ph=phS[0];var setPh=phS[1];
+    var eS=_useState("");var ce=eS[0];var setCe=eS[1];
+    async function save(){
+      setCe("");
+      if(!n){setCe("Nombre obligatorio");return;}
+      if(ph&&!vPhone(ph)){setCe("Telefono debe tener 10 digitos");return;}
+      var item={id:d.id||"c"+Date.now(),name:n,phone:ph,visits:d.visits||0,last:d.last||"-",stamps:d.stamps||0,pts:d.pts||0,since:d.since||today()};
+      d.id?setClients(function(x){return x.map(function(s){return s.id===d.id?item:s;});}):setClients(function(x){return x.concat([item]);});
+      closeM();
+      try{await DB.save("clients",item.id,item);}catch(e){console.error(e);}
+    }
+    return <Mdl title={d.id?"Editar Cliente":"Nuevo Cliente"} close={closeM} save={save}>
+      <Field label="Nombre completo" val={n} set={setN} ph="Carlos Mendez"/>
+      <PhoneInput val={ph} set={setPh}/>
+      {ce&&<div style={{color:C.err,fontSize:12,marginBottom:8}}>⚠️ {ce}</div>}
+    </Mdl>;
+  }
+
+  /* ─── Appt Modal ─── */
+  function ApptMdl(){
+    var d=mdl&&mdl.d||nslot||{};
+    var wiS=_useState(!d.id&&!d.date);var wi=wiS[0];var setWi=wiS[1];
+    var cnS=_useState(d.client||"");var cn=cnS[0];var setCn=cnS[1];
+    var svS=_useState(d.svc||"");var sv=svS[0];var setSv=svS[1];
+    var dtS=_useState(d.date||"");var dt=dtS[0];var setDt=dtS[1];
+    var tmS=_useState(d.time||"");var tm=tmS[0];var setTm=tmS[1];
+    var stS=_useState(d.status||"pendiente");var st=stS[0];var setSt=stS[1];
+    var sfS=_useState(d.stId||selSt||"");var sf=sfS[0];var setSf=sfS[1];
+    var aeS=_useState("");var ae=aeS[0];var setAe=aeS[1];
+    var loadS=_useState(false);var load=loadS[0];var setLoad=loadS[1];
+    async function save(){
+      setAe("");
+      if(!cn){setAe("El nombre del cliente es obligatorio");return;}
+      if(!sv){setAe("Selecciona un servicio");return;}
+      if(!wi&&!dt){setAe("Selecciona una fecha");return;}
+      if(!wi&&!tm){setAe("Selecciona una hora");return;}
+      if(!sf){setAe("Selecciona un profesional");return;}
+      setLoad(true);
+      try{
+        var now2=new Date();
+        var svcObj=null;for(var i=0;i<svcs.length;i++){if(svcs[i].name===sv){svcObj=svcs[i];break;}}
+        var item={id:d.id||"a"+Date.now(),client:cn,svc:sv,svcId:svcObj?svcObj.id:"",stId:sf,date:wi?today():dt,time:wi?(now2.getHours()<10?"0":"")+now2.getHours()+":"+(now2.getMinutes()<30?"00":"30"):tm,status:wi?"walk_in":st,dur:svcObj?svcObj.dur:30};
+        d.id?setAppts(function(x){return x.map(function(a){return a.id===d.id?item:a;});}):setAppts(function(x){return x.concat([item]);});
+        pushNotif("Taseca — Nueva cita",cn+" · "+sv+" · "+(wi?"Ahora":dt+" "+tm));
+        setMdl(null);setNslot(null);
+        try{await DB.save("appointments",item.id,item);}catch(e){console.error(e);}
+        /* Programar recordatorio email si tiene email */
+        if(item.status==="confirmado"){
+          var cliD=null;for(var k=0;k<clients.length;k++){if(clients[k].name===item.client||clients[k].phone===item.phone){cliD=clients[k];break;}}
+          var stfN="";for(var m=0;m<users.length;m++){if(users[m].id===item.stId){stfN=users[m].name;break;}}
+          scheduleReminder(item,cliD,stfN);
+        }
+      }catch(e){
+        setAe("Error al guardar: "+e.message+". Revisa tu conexion a internet.");
+      }
+      setLoad(false);
+    }
+    return <Mdl title={wi?"⚡ Cliente sin cita":"Cita"} close={function(){setMdl(null);setNslot(null);}} save={save}>
+      <div style={{display:"flex",gap:8,marginBottom:11}}>
+        <button type="button" onClick={function(){setWi(false);}} style={{...S.btn(wi?"ghost":"gold"),flex:1,fontSize:12}}>📅 Con cita</button>
+        <button type="button" onClick={function(){setWi(true);}} style={{...S.btn(wi?"cyan":"ghost"),flex:1,fontSize:12,color:wi?"#000":C.muted}}>⚡ Walk-in</button>
+      </div>
+      <Field label="Cliente" val={cn} set={setCn} ph="Nombre"/>
+      <Field label="Servicio" val={sv} set={setSv} opts={svcs.map(function(s){return{v:s.name,l:s.name+" — $"+s.price};})}/>
+      <Field label="Profesional" val={sf} set={setSf} opts={staffL.map(function(u){return{v:u.id,l:u.name};})}/>
+      {!wi&&<>
+        <Field label="Fecha" val={dt} set={setDt} type="date"/>
+        <Field label="Hora" val={tm} set={setTm} opts={SLOTS.map(function(s){return{v:s,l:s};})}/>
+        <Field label="Estado" val={st} set={setSt} opts={[{v:"pendiente",l:"Pendiente"},{v:"confirmado",l:"Confirmado"}]}/>
+      </>}
+      {wi&&<div style={{background:"#8e44ad22",border:"1px solid #8e44ad44",borderRadius:9,padding:"8px 11px",fontSize:11,color:"#c39bd3"}}>⚡ Se registrara con hora actual</div>}
+      {ae&&<div style={{background:C.err+"22",border:"1px solid "+C.err+"55",borderRadius:9,padding:"9px 12px",fontSize:12,color:C.err,marginTop:8}}>⚠️ {ae}</div>}
+      {load&&<div style={{textAlign:"center",fontSize:12,color:C.muted,marginTop:8}}>⏳ Guardando...</div>}
+    </Mdl>;
+  }
+
+  /* ─── Sale Modal ─── */
+  function SaleMdl(){
+    var clS=_useState("");var cl=clS[0];var setCl=clS[1];
+    var itS=_useState("");var it=itS[0];var setIt=itS[1];
+    var toS=_useState("");var to=toS[0];var setTo=toS[1];
+    var mtS=_useState("efectivo");var mt=mtS[0];var setMt=mtS[1];
+    async function save(){
+      if(!cl||!to)return;
+      var item={id:"v"+Date.now(),client:cl,items:it.split(",").map(function(x){return x.trim();}),total:Number(to),method:mt,date:today(),auto:false};
+      setSales(function(x){return x.concat([item]);});closeM();
+      try{await DB.save("sales",item.id,item);}catch(e){console.error("Sale save error:",e);}
+    }
+    return <Mdl title="Nueva Venta" close={closeM} save={save}>
+      <Field label="Cliente" val={cl} set={setCl} ph="Nombre"/>
+      <Field label="Items (separar con coma)" val={it} set={setIt} ph="Corte, Pomada"/>
+      <Field label="Total ($)" val={to} set={setTo} type="number" ph="25"/>
+      <Field label="Metodo" val={mt} set={setMt} opts={[{v:"efectivo",l:"Efectivo"},{v:"tarjeta",l:"Tarjeta"},{v:"transferencia",l:"Transferencia"}]}/>
+    </Mdl>;
+  }
+
+  /* ─── User Modal ─── */
+  function UserMdl(){
+    var d=mdl&&mdl.d||{};
+    var nS=_useState(d.name||"");var n=nS[0];var setN=nS[1];
+    var rS=_useState(d.role||"barbero");var r=rS[0];var setR=rS[1];
+    var eS=_useState(d.email||"");var e=eS[0];var setE=eS[1];
+    var piS=_useState(d.pin||"");var pi=piS[0];var setPi=piS[1];
+    async function save(){
+      if(!n)return;
+      var item=Object.assign({},d.id?d:{id:"u"+Date.now(),photo:null,workDays:[1,2,3,4,5],wStart:"09:00",wEnd:"19:00",blocks:{}},{name:n,role:r,email:e,pin:pi});
+      d.id?setUsers(function(x){return x.map(function(u){return u.id===d.id?item:u;});}):setUsers(function(x){return x.concat([item]);});
+      closeM();
+      try{await DB.save("users",item.id,item);}catch(e){console.error(e);}
+    }
+    return <Mdl title={d.id?"Editar Usuario":"Nuevo Usuario"} close={closeM} save={save}>
+      <Field label="Nombre" val={n} set={setN} ph="Juan Barbero"/>
+      <Field label="Rol" val={r} set={setR} opts={[{v:"admin",l:"Administrador"},{v:"barbero",l:"Barbero"},{v:"tatuador",l:"Tatuador/a"},{v:"recepcionista",l:"Recepcionista"}]}/>
+      <Field label="Email" val={e} set={setE} ph="usuario@shop.com"/>
+      <Field label="PIN (4 digitos)" val={pi} set={setPi} type="number" ph="1234"/>
+    </Mdl>;
+  }
+
+  /* ─── Photo Btn ─── */
+  function PhotoBtn(pp){
+    var u=pp.u,ref=_useRef();
+    return <span>
+      <input type="file" accept="image/*" ref={ref} style={{display:"none"}} onChange={function(e){
+        if(!e.target.files[0])return;
+        var fr=new FileReader();
+        fr.onload=async function(ev){var upd=Object.assign({},u,{photo:ev.target.result});await DB.save("users",u.id,upd);setUsers(function(x){return x.map(function(uu){return uu.id===u.id?upd:uu;});});};
+        fr.readAsDataURL(e.target.files[0]);
+      }}/>
+      <button type="button" style={{...S.btn("ghost"),width:"auto",padding:"4px 9px",fontSize:11}} onClick={function(){ref.current.click();}}>📷</button>
+    </span>;
+  }
+
+  /* ─── Confirm appt ─── */
+  async function confirmAppt(a){
+    /* 1. Actualizar UI inmediatamente */
+    var upd=Object.assign({},a,{status:"confirmado"});
+    setAppts(function(x){return x.map(function(aa){return aa.id===upd.id?upd:aa;});});
+    setAdet(null);
+
+    /* 2. Notificar a admins y recepcionistas en el dispositivo actual */
+    var confirmedBy=user.name;
+    pushNotif("✅ Cita confirmada por "+confirmedBy, a.client+" · "+a.svc+" · "+a.date+" "+a.time);
+
+    /* 3. Guardar notificacion en Firebase para otros usuarios */
+    var notif={
+      id:"n"+Date.now(),
+      type:"confirm",
+      msg:"✅ "+confirmedBy+" confirmó la cita de "+a.client+" ("+a.svc+" · "+a.time+")",
+      date:today(),
+      time:new Date().toLocaleTimeString("es",{hour:"2-digit",minute:"2-digit"}),
+      forRoles:["admin","recepcionista"],
+      read:false,
+      apptId:a.id
+    };
+
+    /* 4. Guardar en Firebase en background */
+    try{
+      await DB.save("appointments",upd.id,upd);
+      try{await DB.save("notifs",notif.id,notif);}catch(e){}
+      /* sello auto */
+      if(stampsOn){
+        var mc=null;for(var i=0;i<clients.length;i++){if(clients[i].name===a.client||clients[i].phone===a.phone){mc=clients[i];break;}}
+        if(mc){var ns=Math.min((mc.stamps||0)+1,10),mcu=Object.assign({},mc,{stamps:ns,pts:(mc.pts||0)+10,visits:(mc.visits||0)+1,last:today()});try{await DB.save("clients",mc.id,mcu);}catch(e){}setClients(function(x){return x.map(function(cc){return cc.id===mc.id?mcu:cc;});});}
+      }
+      /* venta auto */
+      var svcObj=null;for(var j=0;j<svcs.length;j++){if(svcs[j].name===a.svc){svcObj=svcs[j];break;}}
+      var sale={id:"v"+Date.now(),client:a.client,items:[a.svc],total:svcObj?svcObj.price:0,method:"pendiente",date:a.date,auto:true};
+      try{await DB.save("sales",sale.id,sale);}catch(e){}
+      setSales(function(x){return x.concat([sale]);});
+    }catch(e){console.error("confirmAppt error:",e);}
+  }
+
+  /* ─── Clients visible to this user ─── */
+  var visClients=isAdmin?clients:clients.filter(function(cl){return appts.some(function(a){return a.stId===user.id&&(a.client===cl.name||a.phone===cl.phone);});});
+  var visAppts=isAdmin?appts:appts.filter(function(a){return a.stId===user.id;});
+  var visSales=isAdmin?sales:sales.filter(function(s){return visAppts.some(function(a){return a.client===s.client;});});
+
+  return (
+    <div style={{...S.app,paddingBottom:80}}>
+      {/* HEADER */}
+      <div style={{background:"linear-gradient(135deg,#0d1520,#080c10)",padding:"11px 13px 10px",borderBottom:"1px solid "+C.border}}>
+        <div style={S.row}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <Logo size={24}/>
+            <div>
+              <div style={{fontSize:14,fontWeight:900,background:"linear-gradient(90deg,#c9a84c,#4ecdc4)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>TASECA</div>
+              <div style={{fontSize:9,color:C.muted}}>Hola <b style={{color:C.accent}}>{user.name}</b> · {ROLES[user.role]}</div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:7,alignItems:"center"}}>
+            {(user.role==="admin"||user.role==="recepcionista")&&notifs.length>0&&(
+              <div style={{position:"relative"}}>
+                <button type="button" onClick={function(){setShowN(function(v){return !v;});}} style={{background:"none",border:"1px solid "+C.warn+"55",borderRadius:9,padding:"5px 9px",color:C.warn,fontSize:14,cursor:"pointer"}}>
+                  🔔
+                  <span style={{position:"absolute",top:-4,right:-4,background:C.err,color:"#fff",fontSize:8,fontWeight:900,width:14,height:14,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>{notifs.length}</span>
+                </button>
+              </div>
+            )}
+            <button type="button" onClick={function(){setNslot({stId:selSt});}} style={{...S.btn("cyan"),padding:"5px 10px",fontSize:11,color:"#000"}}>⚡ Walk-in</button>
+            <button type="button" onClick={onLogout} style={{background:C.border,border:"none",borderRadius:9,padding:"5px 9px",color:C.muted,fontSize:11,cursor:"pointer"}}>Salir</button>
+          </div>
+        </div>
+      </div>
+
+      {/* PANEL DE NOTIFICACIONES */}
+      {showN&&notifs.length>0&&(
+        <div style={{background:"#1a1a0a",border:"1px solid "+C.warn+"55",margin:"8px 11px",borderRadius:12,padding:"12px 14px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}>
+            <b style={{color:C.warn,fontSize:13}}>🔔 Notificaciones ({notifs.length})</b>
+            <button type="button" onClick={async function(){
+              setShowN(false);
+              var marked=notifs.map(function(n){return Object.assign({},n,{read:true});});
+              setNotifs([]);
+              marked.forEach(async function(n){try{await DB.save("notifs",n.id,n);}catch(e){};});
+            }} style={{background:"none",border:"none",color:C.muted,fontSize:12,cursor:"pointer"}}>Marcar leidas ✓</button>
+          </div>
+          {notifs.map(function(n){return <div key={n.id} style={{background:C.card,borderRadius:9,padding:"9px 11px",marginBottom:7,borderLeft:"3px solid "+C.warn}}>
+            <div style={{fontSize:12,fontWeight:700,marginBottom:2}}>{n.msg}</div>
+            <div style={{fontSize:10,color:C.muted}}>{n.date} · {n.time}</div>
+          </div>;})}
+        </div>
+      )}
+
+      <div style={{padding:"11px 11px"}}>
+
+        {/* AGENDA */}
+        {tab==="agenda"&&<div>
+          <NotifBanner/>
+          {isAdmin&&<div style={{display:"flex",gap:4,marginBottom:8,overflowX:"auto",paddingBottom:3}}>
+            <button type="button" onClick={function(){setSelSt(null);}} style={{...S.btn(selSt===null?"gold":"ghost"),padding:"4px 9px",fontSize:10,whiteSpace:"nowrap",color:selSt===null?"#000":C.muted}}>Todos</button>
+            {staffL.map(function(u){return <button type="button" key={u.id} onClick={function(){setSelSt(u.id);}} style={{...S.btn(selSt===u.id?"cyan":"ghost"),padding:"4px 9px",fontSize:10,whiteSpace:"nowrap",color:selSt===u.id?"#000":C.muted}}>{u.name.split(" ")[0]}</button>;})}
+          </div>}
+          {!isAdmin&&<div style={{fontSize:11,color:C.muted,marginBottom:8,background:C.card,borderRadius:8,padding:"5px 10px",display:"inline-block"}}>📅 Tu agenda</div>}
+          <WeekCal appts={visAppts} users={users} stId={selSt} onSlot={function(d,h,m,sid){setNslot({date:ts(d),time:(h<10?"0":"")+h+":"+(m===0?"00":"30"),stId:sid});}} onAppt={function(a){setAdet(a);}}/>
+          <button type="button" style={fab} onClick={function(){setMdl({type:"appt",d:{}});}}>+</button>
+        </div>}
+
+        {/* CLIENTES */}
+        {tab==="clientes"&&<div>
+          <b style={{fontSize:14,color:C.accent,display:"block",marginBottom:10}}>👥 Clientes</b>
+          {visClients.map(function(c){return <div key={c.id} style={S.card}>
+            <div style={S.row}>
+              <div style={{display:"flex",alignItems:"center",gap:9}}>
+                <div style={{width:36,height:36,borderRadius:"50%",background:C.accent+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>{c.name[0]}</div>
+                <div><b style={{fontSize:13}}>{c.name}</b><div style={{color:C.muted,fontSize:11}}>📞 {c.phone}</div></div>
+              </div>
+              <span style={S.badge(C.accent)}>{c.visits||0}</span>
+            </div>
+            <div style={{marginTop:4,color:C.muted,fontSize:10}}>Ultima: {c.last}</div>
+            <div style={{marginTop:7,display:"flex",gap:6}}>
+              <button type="button" style={{...S.btn("ghost"),width:"auto",padding:"4px 9px",fontSize:11}} onClick={function(){setMdl({type:"client",d:c});}}>Editar</button>
+              {isAdmin&&<button type="button" style={{...S.btn("err"),width:"auto",padding:"4px 9px",fontSize:11}} onClick={async function(){await DB.del("clients",c.id);setClients(function(x){return x.filter(function(cc){return cc.id!==c.id;});});}}>Eliminar</button>}
+            </div>
+          </div>;})}
+          <button type="button" style={fab} onClick={function(){setMdl({type:"client",d:{}});}}>+</button>
+        </div>}
+
+        {/* FIDELIDAD */}
+        {tab==="fidelidad"&&<div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <b style={{fontSize:14,color:C.accent}}>🎫 Programa de Fidelidad</b>
+            {isAdmin&&<div style={{display:"flex",alignItems:"center",gap:7}}>
+              <span style={{fontSize:10,color:C.muted}}>Sellos</span>
+              <Toggle val={stampsOn} onChange={toggleStamps}/>
+              <span style={{fontSize:10,color:stampsOn?C.ok:C.muted,fontWeight:700}}>{stampsOn?"ON":"OFF"}</span>
+            </div>}
+          </div>
+          {!stampsOn&&<div style={{background:"#1a2230",borderRadius:12,padding:"16px",textAlign:"center",marginBottom:13}}>
+            <div style={{fontSize:26,marginBottom:6}}>🔒</div>
+            <div style={{color:C.muted,fontSize:13}}>Programa de sellos desactivado</div>
+            {isAdmin&&<div style={{color:C.accent,fontSize:11,marginTop:4}}>Activa el interruptor para habilitar</div>}
+          </div>}
+          {stampsOn&&<div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:7,marginBottom:12}}>
+              {[[visClients.filter(function(c){return(c.stamps||0)>=10;}).length,"🎁","Premios",C.ok],[visClients.reduce(function(a,c){return a+(c.stamps||0);},0),"✂","Total sellos",C.accent],[visClients.filter(function(c){return(c.stamps||0)>0;}).length,"⭐","Activos",C.cyan]].map(function(x){
+                return <div key={x[2]} style={{background:x[3]+"18",border:"1px solid "+x[3]+"33",borderRadius:11,padding:"9px 6px",textAlign:"center"}}>
+                  <div style={{fontSize:16}}>{x[1]}</div>
+                  <div style={{fontSize:17,fontWeight:900,color:x[3]}}>{x[0]}</div>
+                  <div style={{fontSize:9,color:C.muted}}>{x[2]}</div>
+                </div>;
+              })}
+            </div>
+            {visClients.map(function(c){
+              var n=c.stamps||0,pts=c.pts||0,has=n>=10;
+              return <div key={c.id} style={{...S.card,border:"1px solid "+(has?C.ok+"55":C.border),marginBottom:9}}>
+                <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:8}}>
+                  <div style={{width:34,height:34,borderRadius:"50%",background:has?"linear-gradient(135deg,#2ecc71,#27ae60)":C.accent+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:has?"#fff":"#c9a84c",flexShrink:0,fontWeight:900}}>{c.name[0]}</div>
+                  <div style={{flex:1}}><b style={{fontSize:12}}>{c.name}</b><div style={{color:C.muted,fontSize:10}}>{c.phone}</div></div>
+                  {has&&<span style={S.badge(C.ok)}>🎁 Premio</span>}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:2,marginBottom:6}}>
+                  {Array.from({length:10},function(_,i){return <div key={i} style={{aspectRatio:"1",borderRadius:4,background:i<n?"linear-gradient(135deg,#c9a84c,#f0c040)":C.border,display:"flex",alignItems:"center",justifyContent:"center",fontSize:7}}>{i<n?"✂":""}</div>;  })}
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:7,fontSize:11}}>
+                  <span style={{color:C.muted}}>⭐ Puntos</span><b style={{color:C.accent}}>{pts} pts</b>
+                </div>
+                <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                  <button type="button" style={{...S.btn("gold"),padding:"4px 8px",fontSize:11,color:"#000"}} onClick={async function(){
+                    var ns=Math.min(n+1,10),np=pts+10,upd=Object.assign({},c,{stamps:ns,pts:np,visits:(c.visits||0)+1,last:today()});
+                    setClients(function(x){return x.map(function(cc){return cc.id===c.id?upd:cc;});});
+                    try{await DB.save("clients",c.id,upd);}catch(e){console.error(e);}
+                  }}>+ Sello ✂</button>
+                  {has&&<button type="button" style={{...S.btn("cyan"),padding:"4px 8px",fontSize:11,color:"#000"}} onClick={async function(){
+                    var upd=Object.assign({},c,{stamps:0,pts:pts+50});
+                    setClients(function(x){return x.map(function(cc){return cc.id===c.id?upd:cc;});});
+                    try{await DB.save("clients",c.id,upd);}catch(e){console.error(e);}
+                  }}>🎁 Canjear</button>}
+                  {isAdmin&&<button type="button" style={{...S.btn("ghost"),padding:"4px 8px",fontSize:11}} onClick={async function(){
+                    var upd=Object.assign({},c,{stamps:0});
+                    await DB.save("clients",c.id,upd);setClients(function(x){return x.map(function(cc){return cc.id===c.id?upd:cc;});});
+                  }}>Reiniciar</button>}
+                </div>
+              </div>;
+            })}
+            {visClients.length===0&&<div style={{color:C.muted,textAlign:"center",padding:24,fontSize:13}}>Sin clientes aun</div>}
+          </div>}
+        </div>}
+
+        {/* CATALOGO */}
+        {tab==="catalogo"&&<div>
+          <b style={{fontSize:14,color:C.accent,display:"block",marginBottom:10}}>🛒 Catalogo</b>
+          <div style={{display:"flex",gap:7,marginBottom:10}}>
+            {["servicios","productos"].map(function(t){return <button type="button" key={t} style={{padding:"5px 12px",borderRadius:20,border:"none",background:sub===t?C.accent:C.border,color:sub===t?"#000":C.muted,fontWeight:700,fontSize:12,cursor:"pointer"}} onClick={function(){setSub(t);}}>{t.charAt(0).toUpperCase()+t.slice(1)}</button>;})}
+          </div>
+          {sub==="servicios"&&svcs.map(function(sv){return <div key={sv.id} style={S.card}>
+            <div style={S.row}>
+              <div><b style={{fontSize:13}}>{sv.name}</b><div style={{color:C.muted,fontSize:11}}>⏱ {sv.dur||sv.duration||0} min</div></div>
+              <div style={{textAlign:"right"}}><b style={{color:C.accent,fontSize:14}}>${sv.price}</b><div><span style={S.badge(CAT[sv.cat]||"#888")}>{sv.cat}</span></div></div>
+            </div>
+            {isAdmin&&<div style={{marginTop:7,display:"flex",gap:6}}>
+              <button type="button" style={{...S.btn("ghost"),width:"auto",padding:"4px 9px",fontSize:11}} onClick={function(){setMdl({type:"svc",d:sv});}}>Editar</button>
+              <button type="button" style={{...S.btn("err"),width:"auto",padding:"4px 9px",fontSize:11}} onClick={async function(){await DB.del("services",sv.id);setSvcs(function(x){return x.filter(function(s){return s.id!==sv.id;});});}}>Eliminar</button>
+            </div>}
+          </div>;})}
+          {sub==="productos"&&prods.map(function(pr){return <div key={pr.id} style={S.card}>
+            <div style={S.row}>
+              <div><b style={{fontSize:13}}>{pr.name}</b><div style={{color:pr.stock<5?C.err:C.muted,fontSize:11}}>📦 {pr.stock}</div></div>
+              <b style={{color:C.accent,fontSize:14}}>${pr.price}</b>
+            </div>
+            {isAdmin&&<div style={{marginTop:7,display:"flex",gap:6}}>
+              <button type="button" style={{...S.btn("ghost"),width:"auto",padding:"4px 9px",fontSize:11}} onClick={function(){setMdl({type:"prod",d:pr});}}>Editar</button>
+              <button type="button" style={{...S.btn("err"),width:"auto",padding:"4px 9px",fontSize:11}} onClick={async function(){await DB.del("products",pr.id);setProds(function(x){return x.filter(function(p){return p.id!==pr.id;});});}}>Eliminar</button>
+            </div>}
+          </div>;})}
+          {!isAdmin&&sub==="productos"&&<div style={{background:"#1a2230",borderRadius:10,padding:"11px",textAlign:"center",color:C.muted,fontSize:12}}>Solo el administrador puede gestionar productos</div>}
+          {!isAdmin&&sub==="servicios"&&<div style={{background:"#1a2230",borderRadius:10,padding:"9px 11px",marginTop:4,textAlign:"center",color:C.muted,fontSize:11}}>📋 Solo lectura — contacta al administrador para modificar servicios</div>}
+          {sub==="servicios"&&isAdmin&&<button type="button" style={fab} onClick={function(){setMdl({type:"svc",d:{}});}}>+</button>}
+          {sub==="productos"&&isAdmin&&<button type="button" style={fab} onClick={function(){setMdl({type:"prod",d:{}});}}>+</button>}
+        </div>}
+
+        {/* CAJA */}
+        {tab==="caja"&&<div>
+          <b style={{fontSize:14,color:C.accent,display:"block",marginBottom:10}}>💰 Caja & Ventas</b>
+          <div style={{background:C.accent+"18",border:"1px solid "+C.accent+"44",borderRadius:12,padding:"12px 13px",marginBottom:10}}>
+            <div style={{color:C.muted,fontSize:10}}>Total recaudado</div>
+            <div style={{color:C.accent,fontSize:24,fontWeight:900}}>${totalV}</div>
+            <div style={{color:C.muted,fontSize:10}}>{sales.length} ventas</div>
+          </div>
+          {visSales.map(function(s){return <div key={s.id} style={S.card}>
+            <div style={S.row}>
+              <div><b style={{fontSize:12}}>{s.client}</b><div style={{color:C.muted,fontSize:10}}>{(s.items||[]).join(", ")}</div></div>
+              <div style={{textAlign:"right"}}><b style={{color:C.accent}}>${s.total}</b><div><span style={S.badge(s.method==="pendiente"?C.warn:C.ok)}>{s.auto?"Auto":""} {s.method}</span></div></div>
+            </div>
+            <div style={{marginTop:4,color:C.muted,fontSize:10}}>📆 {s.date}</div>
+          </div>;})}
+          <button type="button" style={fab} onClick={function(){setMdl({type:"sale",d:{}});}}>+</button>
+        </div>}
+
+        {/* REPORTES */}
+        {tab==="reportes"&&<Reportes appts={visAppts} sales={visSales} clients={visClients} users={users} isAdmin={isAdmin}/>}
+
+        {/* CONFIG */}
+        {tab==="config"&&isAdmin&&<div>
+          <b style={{fontSize:14,color:C.accent,display:"block",marginBottom:10}}>⚙️ Configuracion</b>
+
+          {/* Firebase */}
+          <div style={{...S.card,border:"1.5px solid "+C.cyan+"44",marginBottom:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:7}}>
+              <div style={{width:7,height:7,borderRadius:"50%",background:C.ok}}/><b style={{color:C.ok,fontSize:12}}>🔥 Firebase conectado</b>
+            </div>
+          </div>
+
+          {/* Toggle sellos */}
+          <div style={{...S.card,border:"1.5px solid "+(stampsOn?C.ok:C.border),marginBottom:13}}>
+            <div style={S.row}>
+              <div>
+                <b style={{fontSize:13}}>🎫 Programa de Sellos</b>
+                <div style={{fontSize:11,color:C.muted,marginTop:2}}>{stampsOn?"Activo — clientes acumulan sellos":"Inactivo — sellos ocultos"}</div>
+              </div>
+              <Toggle val={stampsOn} onChange={toggleStamps}/>
+            </div>
+          </div>
+
+          {/* Personal */}
+          <b style={{fontSize:12,color:C.cyan,display:"block",marginBottom:9}}>👤 Personal</b>
+          {users.map(function(u){return <div key={u.id} style={S.card}>
+            <div style={{display:"flex",alignItems:"center",gap:9}}>
+              <div style={{width:40,height:40,borderRadius:"50%",background:C.accent+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,overflow:"hidden",flexShrink:0}}>
+                {u.photo?<img src={u.photo} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:u.name[0]}
+              </div>
+              <div>
+                <b style={{fontSize:13}}>{u.name}</b>
+                <div style={{color:C.muted,fontSize:11}}>{ROLES[u.role]}</div>
+                <div style={{color:C.muted,fontSize:10}}>{(u.workDays||[]).map(function(d){return DY[d];}).join("·")} · {u.wStart||"09:00"}-{u.wEnd||"19:00"}</div>
+              </div>
+            </div>
+            <div style={{marginTop:8,display:"flex",gap:5,flexWrap:"wrap"}}>
+              <PhotoBtn u={u}/>
+              <button type="button" style={{...S.btn("ghost"),width:"auto",padding:"4px 9px",fontSize:11}} onClick={function(){setMdl({type:"user",d:u});}}>Editar</button>
+              <button type="button" style={{...S.btn("cyan"),width:"auto",padding:"4px 9px",fontSize:11,color:"#000"}} onClick={function(){setSchUser(u);}}>🗓 Patron</button>
+              <button type="button" style={{...S.btn("err"),width:"auto",padding:"4px 9px",fontSize:11}} onClick={async function(){await DB.del("users",u.id);setUsers(function(x){return x.filter(function(uu){return uu.id!==u.id;});});}}>Eliminar</button>
+            </div>
+          </div>;})}
+          <button type="button" style={{...S.btn(),width:"100%",padding:"10px"}} onClick={function(){setMdl({type:"user",d:{}});}}>+ Agregar usuario</button>
+        </div>}
+      </div>
+
+      {/* TAB BAR */}
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:"#0d1520",borderTop:"1px solid "+C.border,display:"flex",zIndex:100}}>
+        {tabs.map(function(t){return <button type="button" key={t.id} style={{flex:1,padding:"8px 0 6px",background:"none",border:"none",color:tab===t.id?C.accent:C.muted,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:1}} onClick={function(){setTab(t.id);}}>
+          <span style={{fontSize:16}}>{t.icon}</span>
+          <span style={{fontSize:8,fontWeight:tab===t.id?700:400}}>{t.label}</span>
+        </button>;})}
+      </div>
+
+      {/* MODALES */}
+      {mdl&&mdl.type==="svc"&&<SvcMdl/>}
+      {mdl&&mdl.type==="prod"&&<ProdMdl/>}
+      {mdl&&mdl.type==="client"&&<CliMdl/>}
+      {mdl&&(mdl.type==="appt"||mdl.type==="walkin")&&<ApptMdl/>}
+      {mdl&&mdl.type==="sale"&&<SaleMdl/>}
+      {mdl&&mdl.type==="user"&&<UserMdl/>}
+      {nslot&&<ApptMdl/>}
+
+      {/* DETALLE CITA */}
+      {adet&&<div style={S.ov} onClick={function(){setAdet(null);}}>
+        <div style={S.mb} onClick={function(e){e.stopPropagation();}}>
+          <div style={{...S.row,marginBottom:12}}>
+            <b style={{fontSize:14,color:SC[adet.status]||C.accent}}>{SL[adet.status]||adet.status}</b>
+            <button type="button" onClick={function(){setAdet(null);}} style={{background:"none",border:"none",color:C.muted,fontSize:22,cursor:"pointer"}}>✕</button>
+          </div>
+          <div style={{fontSize:18,fontWeight:900,marginBottom:3}}>{adet.client}</div>
+          <div style={{color:C.muted,fontSize:12,marginBottom:11}}>{adet.phone}</div>
+          {[["Servicio",adet.svc],["Fecha",adet.date],["Hora",adet.time],["Duracion",(adet.dur||30)+" min"]].map(function(x){
+            return <div key={x[0]} style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:6,paddingBottom:6,borderBottom:"1px solid "+C.border}}>
+              <span style={{color:C.muted}}>{x[0]}</span><b>{x[1]}</b>
+            </div>;
+          })}
+          <div style={{display:"flex",gap:8,marginTop:10}}>
+            {adet.status!=="confirmado"&&<button type="button" style={{...S.btn("cyan"),flex:1,color:"#000",fontSize:12}} onClick={function(){confirmAppt(adet);}}>✓ Confirmar</button>}
+            <button type="button" style={{...S.btn("err"),flex:1,fontSize:12}} onClick={async function(){await DB.del("appointments",adet.id);setAppts(function(x){return x.filter(function(a){return a.id!==adet.id;});});setAdet(null);}}>Eliminar</button>
+          </div>
+        </div>
+      </div>}
+
+      {/* PATRON HORARIO */}
+      {schUser&&<SchedMdl user={schUser} close={function(){setSchUser(null);}} onSave={async function(upd){await DB.save("users",upd.id,upd);setUsers(function(x){return x.map(function(u){return u.id===upd.id?upd:u;});});setSchUser(null);}}/>}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NOTIFICACIONES PUSH
+═══════════════════════════════════════════════════════════════ */
+function NotifBanner(p){
+  var permS=_useState(Notification&&Notification.permission||"default");
+  var perm=permS[0];var setPerm=permS[1];
+  var visS=_useState(perm==="default");var vis=visS[0];var setVis=visS[1];
+
+  if(!vis||!window.Notification)return null;
+  if(perm==="granted"||perm==="denied")return null;
+
+  async function request(){
+    var r=await Notification.requestPermission();
+    setPerm(r);setVis(false);
+    if(r==="granted"){
+      new Notification("Taseca activado",{body:"Recibiras notificaciones de nuevas citas",icon:"/favicon.ico"});
+    }
+  }
+
+  return (
+    <div style={{background:"linear-gradient(135deg,#1a2230,#111820)",border:"1px solid "+C.accent+"44",borderRadius:13,padding:"13px 15px",marginBottom:11,display:"flex",alignItems:"center",gap:11}}>
+      <div style={{fontSize:28,flexShrink:0}}>🔔</div>
+      <div style={{flex:1}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:2}}>Activar notificaciones</div>
+        <div style={{color:C.muted,fontSize:11}}>Recibe alertas cuando lleguen nuevas citas</div>
+      </div>
+      <div style={{display:"flex",gap:7,flexShrink:0}}>
+        <button type="button" onClick={function(){setVis(false);}} style={{...S.btn("ghost"),padding:"5px 9px",fontSize:11}}>No</button>
+        <button type="button" onClick={request} style={{...S.btn("cyan"),padding:"5px 9px",fontSize:11,color:"#000"}}>Activar</button>
+      </div>
+    </div>
+  );
+}
+
+/* helper para enviar notificacion desde cualquier parte */
+function pushNotif(title,body){
+  if(window.Notification&&Notification.permission==="granted"){
+    try{new Notification(title,{body:body,icon:"/favicon.ico",badge:"/favicon.ico"});}catch(e){}
+  }
+}
+
+/* ─── EMAIL RECORDATORIO ────────────────────────────────────────── */
+async function sendReminder(appt, clientData, staffName){
+  if(!clientData||!clientData.email) return; // sin email no enviamos
+  if(!window.emailjs) return;
+  try{
+    emailjs.init(window.EMAILJS_KEY);
+    await emailjs.send(window.EMAILJS_SVC, window.EMAILJS_TPL, {
+      to_email:   clientData.email,
+      client_name:clientData.name||appt.client,
+      service:    appt.svc,
+      staff:      staffName||"Tu profesional",
+      date:       appt.date,
+      time:       appt.time
+    });
+    console.log("✅ Recordatorio enviado a",clientData.email);
+  }catch(e){
+    console.error("EmailJS error:",e);
+  }
+}
+
+/* Programar recordatorio 1 hora antes */
+function scheduleReminder(appt, clientData, staffName){
+  if(!clientData||!clientData.email) return;
+  var apptTime=new Date(appt.date+"T"+appt.time+":00");
+  var reminderTime=new Date(apptTime.getTime()-60*60*1000); // 1 hora antes
+  var now=new Date();
+  var diff=reminderTime-now;
+  if(diff>0&&diff<24*60*60*1000){ // Solo si es dentro de las próximas 24h
+    console.log("📧 Recordatorio programado para",reminderTime.toLocaleTimeString());
+    setTimeout(function(){
+      sendReminder(appt,clientData,staffName);
+    },diff);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ROOT
+═══════════════════════════════════════════════════════════════ */
+function App(){
+  var scrS=_useState("loading");var scr=scrS[0];var setScr=scrS[1];
+  var userS=_useState(null);var user=userS[0];var setUser=userS[1];
+  var usersS=_useState([]);var users=usersS[0];var setUsers=usersS[1];
+  var svcsS=_useState([]);var svcs=svcsS[0];var setSvcs=svcsS[1];
+  var prodsS=_useState([]);var prods=prodsS[0];var setProds=prodsS[1];
+  var cliS=_useState([]);var clients=cliS[0];var setClients=cliS[1];
+  var aptS=_useState([]);var appts=aptS[0];var setAppts=aptS[1];
+  var salS=_useState([]);var sales=salS[0];var setSales=salS[1];
+  var cfgS=_useState(DEF_CFG);var cfg=cfgS[0];var setCfg=cfgS[1];
+
+  var init=_useCallback(async function(){
+    try{
+      var u=await DB.all("users");if(u.length===0){for(var i=0;i<DEF_USERS.length;i++)await DB.save("users",DEF_USERS[i].id,DEF_USERS[i]);u=DEF_USERS;}
+      setUsers(u);
+      var sv=await DB.all("services");if(sv.length===0){for(var j=0;j<DEF_SVC.length;j++)await DB.save("services",DEF_SVC[j].id,DEF_SVC[j]);sv=DEF_SVC;}
+      setSvcs(sv);
+      setProds(await DB.all("products"));
+      setClients(await DB.all("clients"));
+      setAppts(await DB.all("appointments"));
+      setSales(await DB.all("sales"));
+      var cfArr=await DB.all("config");if(cfArr.length>0)setCfg(cfArr[0]);else await DB.save("config","cfg",DEF_CFG);
+      setScr("public");
+    }catch(e){console.error(e);setScr("public");}
+  },[]);
+
+  _useEffect(function(){
+    if(window._fb)init();
+    else window.addEventListener("fbReady",init,{once:true});
+    return function(){window.removeEventListener("fbReady",init);};
+  },[init]);
+
+  if(scr==="loading")return(
+    <div style={{...S.app,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh"}}>
+      <Logo size={68}/>
+      <div style={{color:C.accent,fontSize:17,fontWeight:900,marginTop:14,letterSpacing:4}}>TASECA</div>
+      <div style={{color:C.muted,fontSize:11,marginTop:7}}>Conectando...</div>
+    </div>
+  );
+
+  if(scr==="login")return <Login users={users} onLogin={function(u){setUser(u);setScr("admin");}} onBack={function(){setScr("public");}}/>;
+  if(scr==="admin")return <Admin user={user} users={users} setUsers={setUsers} svcs={svcs} setSvcs={setSvcs} prods={prods} setProds={setProds} clients={clients} setClients={setClients} appts={appts} setAppts={setAppts} sales={sales} setSales={setSales} cfg={cfg} setCfg={setCfg} onLogout={function(){setUser(null);setScr("public");}}/>;
+  return <Public svcs={svcs} appts={appts} users={users} clients={clients} cfg={cfg} onBook={function(a){setAppts(function(x){return x.concat([a]);});}} onAdmin={function(){setScr("login");}} onReg={function(c){setClients(function(x){return x.concat([c]);});}}/>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
